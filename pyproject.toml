@@ -1,0 +1,159 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "proxystr"
+version = "3.0.0"
+description = "Use a proxy as a string, but achieve broad functionality for various scenarios"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "Mfdi", email = "mfdisanchez@gmail.com" }
+]
+keywords = ["proxy", "http", "socks", "scraping", "automation", "uv"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+httpx = [
+    "httpx>=0.27",
+    "httpx-socks>=0.9",
+]
+aiohttp = [
+    "aiohttp>=3.9",
+    "aiohttp-socks>=0.8",
+]
+requests = [
+    "requests>=2.31",
+]
+curl_cffi = [
+    "curl-cffi>=0.6",
+]
+tls_client = [
+    "tls-client>=1.0",
+]
+all = [
+    "proxystr[httpx,aiohttp,requests,curl_cffi,tls_client]",
+]
+
+[dependency-groups]
+httpx = [
+    "httpx>=0.27",
+    "httpx-socks>=0.9",
+]
+
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.8",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/mfdi/proxystr"
+Repository = "https://github.com/mfdi/proxystr"
+Issues = "https://github.com/mfdi/proxystr/issues"
+
+[project.scripts]
+proxystr = "proxystr.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["proxystr"]
+
+[tool.uv]
+default-groups = ["httpx", "dev"]
+
+# =========================
+# RUFF (lint + format)
+# =========================
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+src = ["proxystr", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "SIM", # simplify
+    "ARG", # unused args
+    "PIE", # misc improvements
+    "RET", # return issues
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501", # handled by formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "ARG", "FBT"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+# =========================
+# MYPY (STRICT)
+# =========================
+[tool.mypy]
+python_version = "3.8"
+
+strict = true
+
+disallow_any_unimported = true
+disallow_any_expr = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+
+strict_equality = true
+
+pretty = true
+show_error_codes = true
+
+ignore_missing_imports = true
+
+# Relax tests slightly
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+# =========================
+# PYTEST
+# =========================
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+]
