@@ -12,11 +12,41 @@ from .base import BackendResponse, BaseBackend
 
 
 class CurlBackend(BaseBackend):
+    """TLS-impersonating :class:`BaseBackend` using ``curl_cffi.requests``.
+
+    Supports HTTP/HTTPS and SOCKS URLs understood by curl_cffi. Browser impersonation defaults to
+    ``impersonate='chrome'`` unless overridden in ``**kwargs``.
+
+    Attributes
+    ----------
+    name: :class:`str`
+        Constant ``curl_cffi``.
+    """
+
     name = "curl_cffi"
 
     def get(
         self, url: str, proxy: Proxy, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
     ) -> BackendResponse:
+        """Synchronous GET through *proxy* using curl_cffi's requests compatibility layer.
+
+        Args:
+            url (str): Target URL.
+            proxy (Proxy): HTTP or SOCKS proxy URL.
+            timeout (float): Passed as integer seconds to curl_cffi when set.
+            **kwargs (Any): May include ``impersonate`` (default ``"chrome"``).
+
+        Returns:
+            BackendResponse: Parsed response.
+
+        Raises:
+            ImportError: If curl_cffi is not installed.
+            ValueError: If the proxy protocol is unsupported.
+
+        Example:
+            >>> CurlBackend.get.__name__
+            'get'
+        """
         try:
             from curl_cffi import requests as curl_requests  # type: ignore
         except ImportError as e:
@@ -82,6 +112,21 @@ class CurlBackend(BaseBackend):
     async def arequest_direct(
         self, method: str, url: str, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
     ) -> BackendResponse:
+        """Thread-pooled async wrapper around :meth:`request_direct`.
+
+        Args:
+            method (str): HTTP verb.
+            url (str): Target URL.
+            timeout (float): Timeout seconds.
+            **kwargs (Any): Forwarded to :meth:`request_direct`.
+
+        Returns:
+            BackendResponse: Parsed response.
+
+        Example:
+            >>> CurlBackend.arequest_direct.__name__
+            'arequest_direct'
+        """
         return await asyncio.to_thread(
             lambda: self.request_direct(method, url, timeout=timeout, **kwargs)
         )

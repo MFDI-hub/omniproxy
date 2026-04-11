@@ -9,6 +9,21 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str):
+    """Resolve ``Client`` or ``AsyncClient`` from ``backends.httpx_client`` lazily.
+
+    Args:
+        name (str): ``"Client"`` or ``"AsyncClient"``.
+
+    Returns:
+        type: The httpx-backed client class.
+
+    Raises:
+        AttributeError: If *name* is not recognized.
+
+    Example:
+        >>> from omniproxy import client as c  # doctest: +SKIP
+        >>> c.Client  # doctest: +SKIP
+    """
     if name == "Client":
         from .backends.httpx_client import Client as _Client
 

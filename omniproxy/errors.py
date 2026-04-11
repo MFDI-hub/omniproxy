@@ -2,36 +2,78 @@
 
 
 class OmniproxyError(Exception):
-    """Base exception for all omniproxy errors."""
+    """Base exception type for all omniproxy-specific failures.
+
+    Subclass this (or one of its derivatives below) if you extend the library with custom errors
+    that should be distinguishable from built-in :class:`Exception` types.
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Standard exception tuple (message and optional cause data).
+    """
 
 
 class ProxyPoolError(OmniproxyError):
-    """Base exception for proxy pool related errors."""
+    """Base class for errors raised by :class:`~omniproxy.pool.ProxyPool` selection or accounting.
+
+    Concrete subclasses describe **why** acquisition failed (empty pool, no filter match, or
+    saturation under limits).
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Human-readable detail string as ``args[0]`` in typical raises.
+    """
 
 
 class PoolExhausted(ProxyPoolError):
-    """
-    Raised when the pool has no active proxies available,
-    and no refresh mechanism could replenish it within the timeout.
+    """Raised when there are no active proxies, or a refresh timed out / returned nothing usable.
+
+    .. note::
+
+        :meth:`~omniproxy.pool.ProxyPool.get_next` may invoke :attr:`~omniproxy.config.PoolConfig.refresh_callback`
+        once before surfacing this error when configured.
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Explanation such as ``No proxies available`` or ``Refresh timed out``.
     """
 
 
 class PoolSaturated(ProxyPoolError):
-    """
-    Raised when matching proxies exist in the pool,
-    but all are currently at their maximum concurrent connection limit.
+    """Raised when candidate proxies exist for the given filters but all are blocked by limits.
+
+    Triggers when every matching URL is at ``max_connections_per_proxy`` **or** fails the
+    per-URL RPS token bucket (:class:`TokenBucket`).
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Default message explains saturation (connections and/or rate limits).
     """
 
 
 class NoMatchingProxy(ProxyPoolError):
-    """
-    Raised when the pool contains proxies, but none match
-    the requested attribute filters (e.g., country="US", min_anonymity="elite").
+    """Raised when the active pool is non-empty but **no** proxy satisfies the filter kwargs.
+
+    Unlike :exc:`PoolExhausted`, this indicates a **pure filter miss** (e.g. wrong ``country``).
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Message names the failed filter combination.
     """
 
 
 class MissingProxyMetadata(ProxyPoolError):
-    """
-    Raised when ``filter_missing_metadata`` is ``"raise"`` and a proxy lacks
-    metadata required to apply a filter (e.g. ``min_anonymity`` with unset anonymity).
+    """Raised when ``PoolConfig.filter_missing_metadata='raise'`` and a required field is unset.
+
+    Typical case: ``min_anonymity='elite'`` but :attr:`~omniproxy.proxy.Proxy.anonymity` is ``None``.
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Message identifies the proxy (often :attr:`~omniproxy.proxy.Proxy.safe_url`) and missing key.
     """

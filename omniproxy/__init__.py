@@ -42,6 +42,20 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    """Lazy-import ``Client`` / ``AsyncClient`` from the httpx extra on attribute access.
+
+    Args:
+        name (str): Attribute name being resolved (``"Client"`` or ``"AsyncClient"``).
+
+    Returns:
+        type: The requested client class.
+
+    Raises:
+        AttributeError: If *name* is not a supported lazy attribute.
+
+    Example:
+        >>> from omniproxy import Client  # doctest: +SKIP
+    """
     if name == "Client":
         from .backends.httpx_client import Client as _Client
 

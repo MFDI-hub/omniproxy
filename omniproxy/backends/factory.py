@@ -12,11 +12,35 @@ if TYPE_CHECKING:
 
 
 def supported_backends() -> tuple[str, ...]:
-    """Stable names accepted by :func:`get_backend` (aliases normalized)."""
+    """Return stable backend names accepted by :func:`get_backend`.
+
+    Returns:
+        tuple[str, ...]: Ordered names matching :data:`~omniproxy.constants.SUPPORTED_BACKENDS`.
+
+    Example:
+        >>> "httpx" in supported_backends()
+        True
+    """
     return SUPPORTED_BACKENDS
 
 
 def get_backend(name: str | None = None) -> BaseBackend:
+    """Instantiate the configured HTTP backend implementation.
+
+    Args:
+        name (str | None): Backend key; ``None`` uses ``settings.default_backend``.
+
+    Returns:
+        BaseBackend: Concrete backend instance.
+
+    Raises:
+        ImportError: If the optional dependency for that backend is missing.
+        ValueError: If *name* is unknown.
+
+    Example:
+        >>> get_backend.__name__
+        'get_backend'
+    """
     from ..config import settings
 
     key = (name or settings.default_backend).lower().replace("-", "_")

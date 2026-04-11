@@ -21,15 +21,19 @@ OMNIPROXY_CONFIG_PUBLIC_KEYS: frozenset[str] = frozenset(
         "default_backend",
         "default_timeout",
         "default_connect_timeout",
-        "default_check_url",
-        "default_check_info_url_template",
+        "default_check_urls",
+        "default_check_info_url_templates",
+        "health_check_urls",
     }
 )
 
 DEFAULT_BACKEND: str = "httpx"
 DEFAULT_TIMEOUT: float = 10.0
-DEFAULT_CHECK_URL: str = "https://api.ipify.org/?format=json"
-DEFAULT_CHECK_INFO_URL_TEMPLATE: str = "http://ip-api.com/json/?fields={fields}"
+DEFAULT_CHECK_URLS: tuple[str, ...] = ("https://api.ipify.org/?format=json",)
+DEFAULT_CHECK_INFO_URL_TEMPLATES: tuple[str, ...] = (
+    "http://ip-api.com/json/?fields={fields}",
+)
+DEFAULT_HEALTH_CHECK_URLS: tuple[str, ...] = ()
 
 # --- Proxy check / anonymity probe ---
 DEFAULT_CHECK_FIELDS: str = "8211"
@@ -98,7 +102,16 @@ PROXY_STRUCTURAL_FIELDS: tuple[str, ...] = (
     "port",
     "rotation_url",
 )
-PROXY_METADATA_FIELDS: tuple[str, ...] = ("latency", "anonymity", "last_checked", "last_status")
+PROXY_METADATA_FIELDS: tuple[str, ...] = (
+    "latency",
+    "anonymity",
+    "last_checked",
+    "last_status",
+    "country",
+    "city",
+    "asn",
+    "org",
+)
 PROXY_PATTERN_ALLOWED_WORDS: frozenset[str] = frozenset(PROXY_STRUCTURAL_FIELDS)
 DEFAULT_PROXY_PATTERN_STRING: str = "protocol://username:password@ip:port"
 
@@ -126,10 +139,11 @@ __all__ = [
     "DEFAULT_BACKEND",
     "DEFAULT_BACKEND_TIMEOUT",
     "DEFAULT_CHECK_FIELDS",
-    "DEFAULT_CHECK_INFO_URL_TEMPLATE",
+    "DEFAULT_CHECK_INFO_URL_TEMPLATES",
     "DEFAULT_CHECK_MAX_RETRIES",
     "DEFAULT_CHECK_RETRY_BACKOFF",
-    "DEFAULT_CHECK_URL",
+    "DEFAULT_CHECK_URLS",
+    "DEFAULT_HEALTH_CHECK_URLS",
     "DEFAULT_FETCH_USER_AGENT",
     "DEFAULT_PROXY_PATTERN_STRING",
     "DEFAULT_RETRYABLE_HTTP_STATUSES",
