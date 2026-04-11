@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import contextvars
 import random
 import threading
@@ -10,23 +11,63 @@ import time
 import weakref
 from collections import deque
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from .config import PoolConfig, Strategy
 from .constants import ANONYMITY_RANKS
 from .errors import MissingProxyMetadata, NoMatchingProxy, PoolExhausted, PoolSaturated
-from .extended_proxy import Proxy
+from .extended_proxy import Proxy, arun_health_check
+
+
+@dataclass(slots=True)
+class TokenBucket:
+    """Per-URL token bucket used internally when :attr:`PoolConfig.max_rps_per_proxy` is set.
+
+    Instances are created lazily inside :meth:`ProxyPool._consume_token` and mutated on each
+    successful token acquisition.
+
+    Attributes
+    ----------
+    rate: :class:`float`
+        Tokens added per elapsed second (requests-per-second cap).
+    capacity: :class:`float`
+        Maximum stored tokens (burst ceiling), at least ``1.0``.
+    tokens: :class:`float`
+        Current spendable tokens after the last refill calculation.
+    last_refill: :class:`float`
+        Last ``time.monotonic()`` sample used to integrate refill.
+    """
+
+    rate: float
+    capacity: float
+    tokens: float
+    last_refill: float
 
 
 class ProxyPool:
-    """Thread-safe pool with round-robin or random selection and cooldown blacklist.
+    """Thread-safe collection of :class:`~omniproxy.extended_proxy.Proxy` objects with rotation and cooldowns.
 
-    Parameters
+    Selection is driven by :attr:`config` (round-robin over a :class:`collections.deque` or random
+    over a :class:`list`). Failed proxies can be blacklisted for :attr:`~omniproxy.config.PoolConfig.cooldown`
+    seconds; optional per-URL concurrency and RPS caps raise :exc:`~omniproxy.errors.PoolSaturated`
+    when saturated. Sync and async ``with`` statements acquire a proxy, track in-flight use, and
+    optionally record success/failure (see :attr:`~omniproxy.config.PoolConfig.auto_mark_failed_on_exception`).
+
+    .. note::
+
+        Filter kwargs passed to :meth:`get_next` / :meth:`aget_next` compare **equality** against
+        metadata attributes on each proxy, plus special handling for ``min_anonymity`` against
+        :data:`~omniproxy.constants.ANONYMITY_RANKS`.
+
+    Attributes
     ----------
-    proxies:
-        Initial list of proxies (``Proxy`` instances or raw strings).
-    config:
-        :class:`PoolConfig` instance.
+    config: :class:`~omniproxy.config.PoolConfig`
+        Live configuration object; may be replaced only by constructing a new pool.
+    proxies
+        Active proxy sequence: a :class:`collections.deque` for ``round_robin`` or a :class:`list`
+        for ``random``. Do not mutate directly; use :meth:`mark_failed`, :meth:`mark_success`,
+        :meth:`reset`, or refresh callbacks.
     """
 
     __slots__ = (
@@ -37,6 +78,9 @@ class ProxyPool:
         "_cooldown_until",
         "_failure_counts",
         "_finalize_ref",
+        "_health_loop",
+        "_health_task",
+        "_health_thread",
         "_index",
         "_index_cache",
         "_index_dirty",
@@ -47,6 +91,7 @@ class ProxyPool:
         "_refresh_event_sync",
         "_success_counts",
         "_task_proxy",
+        "_token_buckets",
         "config",
         "proxies",
     )
@@ -60,6 +105,21 @@ class ProxyPool:
         strategy: Strategy | None = None,
         cooldown: float | None = None,
     ) -> None:
+        """Create a pool from seed proxies and optional :class:`~omniproxy.config.PoolConfig`.
+
+        Args:
+            proxies (list[Proxy | str]): Seed proxies.
+            config (PoolConfig | None): Full pool behaviour configuration.
+            strategy (Strategy | None): Shorthand to override ``config.strategy``.
+            cooldown (float | None): Shorthand to override ``config.cooldown``.
+
+        Returns:
+            None
+
+        Example:
+            >>> ProxyPool([], PoolConfig(strategy="random")).config.strategy
+            'random'
+        """
         if config is None:
             config = PoolConfig()
         if strategy is not None:
@@ -110,8 +170,22 @@ class ProxyPool:
             self, _finalize_pool_connections, self._active_connections, self._lock
         )
 
+        self._health_task: asyncio.Task | None = None
+        self._health_thread: threading.Thread | None = None
+        self._health_loop: asyncio.AbstractEventLoop | None = None
+        self._token_buckets: dict[str, TokenBucket] | None = None
+
     @property
     def _async_lock(self) -> asyncio.Lock:
+        """Lazily create the :class:`asyncio.Lock` guarding async pool accounting.
+
+        Returns:
+            asyncio.Lock: Shared lock instance for this pool.
+
+        Example:
+            >>> type(ProxyPool(["127.0.0.1:1"])._async_lock).__name__
+            'Lock'
+        """
         lock = self._async_lock_obj
         if lock is None:
             lock = asyncio.Lock()
@@ -120,6 +194,15 @@ class ProxyPool:
 
     @property
     def _refresh_event_async(self) -> asyncio.Event:
+        """Event coordinating async refresh callbacks with :meth:`aget_next`.
+
+        Returns:
+            asyncio.Event: Initially set; cleared while ``arefresh_callback`` runs.
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"])._refresh_event_async.is_set()
+            True
+        """
         ev = self._refresh_event_async_obj
         if ev is None:
             ev = asyncio.Event()
@@ -133,24 +216,79 @@ class ProxyPool:
 
     @staticmethod
     def _key(p: Proxy) -> str:
+        """Stable dedupe key for a proxy (canonical URL string).
+
+        Args:
+            p (Proxy): Proxy instance.
+
+        Returns:
+            str: ``p.url``.
+
+        Example:
+            >>> ProxyPool._key(Proxy("127.0.0.1:9")).startswith("http")
+            True
+        """
         return p.url
 
     @staticmethod
     def _filter_cache_key(kwargs: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
+        """Normalise filter kwargs for the selection index cache.
+
+        Args:
+            kwargs (dict[str, Any]): Attribute filters passed to :meth:`get_next`.
+
+        Returns:
+            tuple[tuple[str, Any], ...]: Sorted key-value pairs.
+
+        Example:
+            >>> ProxyPool._filter_cache_key({"country": "US"})
+            (('country', 'US'),)
+        """
         return tuple(sorted(kwargs.items()))
 
     def _normalize_index(self) -> None:
+        """Wrap :attr:`_index` modulo list length for round-robin bookkeeping.
+
+        Returns:
+            None
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1", "127.0.0.1:2"], PoolConfig(structure="list"))
+            >>> pool._index = 5
+            >>> pool._normalize_index()
+            >>> pool._index in (0, 1)
+            True
+        """
         if self.proxies and isinstance(self.proxies, list):
             self._index = self._index % len(self.proxies)
         else:
             self._index = 0
 
     def _snapshot_active_order(self) -> list[Proxy]:
+        """Copy the current active deque/list under the pool lock (caller must hold lock rules).
+
+        Returns:
+            list[Proxy]: Shallow copy of ``self.proxies``.
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool._snapshot_active_order()[0].port
+            1
+        """
         return list(self.proxies)
 
     def _purge_cooldown(self) -> None:
+        """Expire cooldown entries and re-admit proxies whose timers elapsed.
+
+        Returns:
+            None
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"])._purge_cooldown() is None
+            True
+        """
         now = time.time()
-        restored = False
+        restored_proxies: list[Proxy] = []
         for k, until in list(self._cooldown_until.items()):
             if until <= now:
                 del self._cooldown_until[k]
@@ -160,11 +298,27 @@ class ProxyPool:
                 self.proxies.append(p)
                 self._active_keys.add(k)
                 self._failure_counts.pop(k, None)
-                restored = True
-        if restored:
+                restored_proxies.append(p)
+        if restored_proxies:
             self._index_dirty = True
+        if restored_proxies and (cb := self.config.on_proxy_recovered):
+            for rp in restored_proxies:
+                cb(rp)
 
     def _release_active_slot(self, proxy: Proxy) -> None:
+        """Decrement in-flight connection count after a context-managed use.
+
+        Args:
+            proxy (Proxy): Proxy that was acquired.
+
+        Returns:
+            None
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool._release_active_slot(Proxy("127.0.0.1:1")) is None
+            True
+        """
         k = self._key(proxy)
         with self._lock:
             n = self._active_connections.get(k, 0)
@@ -172,6 +326,43 @@ class ProxyPool:
                 self._active_connections.pop(k, None)
             else:
                 self._active_connections[k] = n - 1
+        if (cb := self.config.on_proxy_released):
+            cb(proxy)
+
+    def _consume_token(self, k: str) -> bool:
+        """Try to take one RPS token for proxy key *k* when rate limiting is enabled.
+
+        Args:
+            k (str): Canonical proxy URL key.
+
+        Returns:
+            bool: ``True`` if a request slot is granted.
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool._consume_token("http://127.0.0.1:1")
+            True
+        """
+        rps = self.config.max_rps_per_proxy
+        if rps is None or rps <= 0:
+            return True
+        if self._token_buckets is None:
+            self._token_buckets = {}
+        now = time.monotonic()
+        b = self._token_buckets.get(k)
+        if b is None:
+            cap = max(1.0, float(rps))
+            self._token_buckets[k] = TokenBucket(
+                rate=float(rps), capacity=cap, tokens=cap, last_refill=now
+            )
+            b = self._token_buckets[k]
+        elapsed = now - b.last_refill
+        b.tokens = min(b.capacity, b.tokens + b.rate * elapsed)
+        b.last_refill = now
+        if b.tokens >= 1.0:
+            b.tokens -= 1.0
+            return True
+        return False
 
     def _min_anonymity_rank(self, label: str) -> int:
         key = label.lower()
@@ -182,6 +373,23 @@ class ProxyPool:
         return ANONYMITY_RANKS[key]
 
     def _proxy_passes_filters(self, proxy: Proxy, kwargs: dict[str, Any]) -> bool:
+        """Return whether *proxy* satisfies all attribute filters in *kwargs*.
+
+        Args:
+            proxy (Proxy): Candidate proxy.
+            kwargs (dict[str, Any]): Equality filters plus optional ``min_anonymity``.
+
+        Returns:
+            bool: ``True`` if the proxy matches.
+
+        Raises:
+            MissingProxyMetadata: When ``filter_missing_metadata="raise"`` and data is absent.
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool._proxy_passes_filters(Proxy("127.0.0.1:1"), {})
+            True
+        """
         fm = self.config.filter_missing_metadata
         for key, value in kwargs.items():
             if key == "min_anonymity":
@@ -221,12 +429,39 @@ class ProxyPool:
         return True
 
     def _filter_proxies_for_kwargs(self, kwargs: dict[str, Any]) -> list[Proxy]:
+        """Return active proxies matching *kwargs* filters.
+
+        Args:
+            kwargs (dict[str, Any]): Filters for :meth:`_proxy_passes_filters`.
+
+        Returns:
+            list[Proxy]: Matching subset (all active if *kwargs* is empty).
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1", "127.0.0.1:2"])
+            >>> len(pool._filter_proxies_for_kwargs({}))
+            2
+        """
         active = self._snapshot_active_order()
         if not kwargs:
             return list(active)
         return [p for p in active if self._proxy_passes_filters(p, kwargs)]
 
     def _ordered_candidates(self, subset: list[Proxy], pool_ordered: list[Proxy]) -> list[Proxy]:
+        """Order *subset* members according to pool strategy and current rotation index.
+
+        Args:
+            subset (list[Proxy]): Filtered candidates.
+            pool_ordered (list[Proxy]): Active pool snapshot order.
+
+        Returns:
+            list[Proxy]: Candidates in probe order (shuffled for ``random``).
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1", "127.0.0.1:2"])
+            >>> len(pool._ordered_candidates(list(pool.proxies), list(pool.proxies))) >= 1
+            True
+        """
         subset_keys = {self._key(p) for p in subset}
         candidates = [p for p in pool_ordered if self._key(p) in subset_keys]
         if self.config.strategy == "random":
@@ -238,6 +473,23 @@ class ProxyPool:
         return candidates[start:] + candidates[:start]
 
     def _select_candidate(self, **kwargs: Any) -> Proxy:
+        """Pick the next proxy matching filters, respecting limits (must hold sync rules).
+
+        Args:
+            **kwargs (Any): Forwarded as selection filters.
+
+        Returns:
+            Proxy: Chosen proxy with its in-flight counter incremented.
+
+        Raises:
+            PoolExhausted: When no proxies are active.
+            NoMatchingProxy: When filters exclude every active proxy.
+            PoolSaturated: When limits block every matching proxy.
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"])._select_candidate().port
+            1
+        """
         with self._lock:
             self._purge_cooldown()
             if self._index_dirty:
@@ -269,16 +521,35 @@ class ProxyPool:
                         saturated = True
                         continue
 
+                if self.config.max_rps_per_proxy is not None and not self._consume_token(k):
+                    saturated = True
+                    continue
+
                 self._active_connections[k] = self._active_connections.get(k, 0) + 1
                 if self.config.strategy == "round_robin" and nc:
                     self._index = (self._index + i + 1) % nc
                 return p
 
             if saturated:
-                raise PoolSaturated("All matching proxies are at max concurrent connections")
+                raise PoolSaturated(
+                    "All matching proxies are saturated (connections and/or rate limits)"
+                )
             raise PoolExhausted("No proxies available")
 
     def _merge_refreshed_proxies(self, raw: list[Proxy | str]) -> None:
+        """Append refreshed proxies to prototypes and active set when not cooling down.
+
+        Args:
+            raw (list[Proxy | str]): New proxies from a refresh callback.
+
+        Returns:
+            None
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool._merge_refreshed_proxies(["127.0.0.1:2"]) is None
+            True
+        """
         with self._lock:
             for item in raw:
                 p = Proxy(item) if not isinstance(item, Proxy) else item
@@ -293,6 +564,15 @@ class ProxyPool:
             self._index_dirty = True
 
     def _run_refresh_sync(self) -> None:
+        """Invoke ``refresh_callback`` and merge results, signalling waiters via sync event.
+
+        Returns:
+            None
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"])._run_refresh_sync() is None
+            True
+        """
         cb = self.config.refresh_callback
         if cb is None:
             self._refresh_event_sync.set()
@@ -305,6 +585,16 @@ class ProxyPool:
             self._refresh_event_sync.set()
 
     async def _run_arefresh_async(self) -> None:
+        """Await ``arefresh_callback`` and merge proxies, signalling async waiters.
+
+        Returns:
+            None
+
+        Example:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(ProxyPool._run_arefresh_async)
+            True
+        """
         cb = self.config.arefresh_callback
         if cb is None:
             self._refresh_event_async.set()
@@ -317,27 +607,274 @@ class ProxyPool:
             self._refresh_event_async.set()
 
     # ------------------------------------------------------------------
+    # Background health monitoring
+    # ------------------------------------------------------------------
+
+    async def _run_health_loop(self) -> None:
+        """Background loop: health-check proxies on ``recovery_interval`` cadence.
+
+        Returns:
+            None
+
+        Raises:
+            asyncio.CancelledError: Propagated when monitoring is stopped.
+
+        Example:
+            >>> ProxyPool._run_health_loop.__name__
+            '_run_health_loop'
+        """
+        hc = self.config.health_check
+        if hc is None:
+            return
+        try:
+            while True:
+                with self._lock:
+                    active = list(self.proxies)
+                    cooling = [p for p in self._prototypes if self._key(p) in self._cooldown_until]
+                ordered: dict[str, Proxy] = {}
+                for p in active + cooling:
+                    ordered[self._key(p)] = p
+                proxies_to_check = list(ordered.values())
+
+                if proxies_to_check:
+                    results = await asyncio.gather(
+                        *[arun_health_check(p, hc) for p in proxies_to_check],
+                        return_exceptions=True,
+                    )
+                    for item in results:
+                        if isinstance(item, BaseException):
+                            continue
+                        p, result = item
+                        if (cb := self.config.on_check_complete):
+                            cb(p, result)
+                    for item in results:
+                        if isinstance(item, BaseException):
+                            continue
+                        p, result = item
+                        if result.success:
+                            self.mark_success(p)
+                        else:
+                            self.mark_failed(p, result.exc_type)
+
+                await asyncio.sleep(hc.recovery_interval)
+        except asyncio.CancelledError:
+            raise
+
+    def start_monitoring(self) -> None:
+        """Start :meth:`_run_health_loop` as a task on the current running asyncio loop.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If ``config.health_check`` is unset.
+            RuntimeError: If called without a running loop or conflicting monitoring modes.
+
+        Example:
+            >>> ProxyPool.start_monitoring.__name__
+            'start_monitoring'
+        """
+        if self.config.health_check is None:
+            raise ValueError("PoolConfig.health_check is required for background monitoring")
+        if self._health_thread is not None and self._health_thread.is_alive():
+            raise RuntimeError(
+                "Thread-based monitoring is active; call stop_monitoring() before start_monitoring()"
+            )
+        try:
+            current = asyncio.get_running_loop()
+        except RuntimeError as err:
+            raise RuntimeError("start_monitoring() requires a running asyncio event loop") from err
+        if self._health_task is not None and not self._health_task.done():
+            if self._health_task.get_loop() is current:
+                return
+            raise RuntimeError(
+                "A health monitoring task is already running on a different event loop"
+            )
+        self._health_task = current.create_task(self._run_health_loop())
+
+    def start_monitoring_thread(self) -> None:
+        """Run the health loop in a dedicated background thread with its own event loop.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If ``config.health_check`` is unset.
+            RuntimeError: If incompatible in-loop monitoring is already active.
+
+        Example:
+            >>> ProxyPool.start_monitoring_thread.__name__
+            'start_monitoring_thread'
+        """
+        if self.config.health_check is None:
+            raise ValueError("PoolConfig.health_check is required for background monitoring")
+        if self._health_thread is not None and self._health_thread.is_alive():
+            return
+        try:
+            current = asyncio.get_running_loop()
+        except RuntimeError:
+            current = None
+        if (
+            current is not None
+            and self._health_task is not None
+            and not self._health_task.done()
+            and self._health_task.get_loop() is current
+        ):
+            raise RuntimeError(
+                "In-loop monitoring is active; call stop_monitoring() before start_monitoring_thread()"
+            )
+
+        ready_event = threading.Event()
+
+        def _thread_target() -> None:
+            """Thread entrypoint that owns the health-check asyncio loop.
+
+            Returns:
+                None
+
+            Example:
+                >>> True
+                True
+            """
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._health_loop = loop
+            self._health_task = loop.create_task(self._run_health_loop())
+            ready_event.set()
+            try:
+                loop.run_forever()
+            finally:
+                self._health_task = None
+                self._health_loop = None
+                if not loop.is_closed():
+                    loop.close()
+
+        self._health_thread = threading.Thread(
+            target=_thread_target,
+            name="omniproxy-pool-health",
+            daemon=True,
+        )
+        self._health_thread.start()
+        ready_event.wait(timeout=5.0)
+
+    def stop_monitoring(self) -> None:
+        """Cancel thread-based or in-loop health monitoring tasks.
+
+        Returns:
+            None
+
+        Example:
+            >>> ProxyPool.stop_monitoring.__name__
+            'stop_monitoring'
+        """
+        th = self._health_thread
+        if th is not None and th.is_alive():
+            loop = self._health_loop
+            task = self._health_task
+
+            def _stop() -> None:
+                """Cancel health task and stop the dedicated health loop (thread-safe).
+
+                Returns:
+                    None
+
+                Example:
+                    >>> True
+                    True
+                """
+                if task is not None and not task.done():
+                    task.cancel()
+                if loop is not None and loop.is_running():
+                    loop.stop()
+
+            if loop is not None:
+                loop.call_soon_threadsafe(_stop)
+            th.join(timeout=30.0)
+            self._health_thread = None
+            self._health_loop = None
+            self._health_task = None
+            return
+
+        t = self._health_task
+        if t is not None and not t.done():
+            t.cancel()
+        self._health_task = None
+
+    @contextlib.asynccontextmanager
+    async def monitoring(self):
+        """Async context manager that starts then stops in-loop health monitoring.
+
+        Yields:
+            ProxyPool: ``self`` for the duration of the ``async with`` block.
+
+        Example:
+            >>> ProxyPool.monitoring.__name__
+            'monitoring'
+        """
+        self.start_monitoring()
+        try:
+            yield self
+        finally:
+            self.stop_monitoring()
+
+    # ------------------------------------------------------------------
     # Core selection
     # ------------------------------------------------------------------
 
     def get_next(self, **kwargs: Any) -> Proxy:
+        """Acquire the next proxy synchronously, optionally filtered by *kwargs*.
+
+        Args:
+            **kwargs (Any): Attribute filters (e.g. ``country="US"``, ``min_anonymity="elite"``).
+
+        Returns:
+            Proxy: Selected proxy (in-flight counter incremented).
+
+        Raises:
+            PoolExhausted: If empty and refresh cannot help.
+            PoolSaturated: If all matches are at connection/RPS limits.
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"]).get_next().port
+            1
+        """
         if not self._refresh_event_sync.wait(timeout=self.config.refresh_timeout):
             raise PoolExhausted("Refresh timed out")
         try:
-            return self._select_candidate(**kwargs)
+            proxy = self._select_candidate(**kwargs)
         except PoolExhausted:
             if self.config.on_exhausted is not None:
                 self.config.on_exhausted()
             if self.config.refresh_callback is not None:
                 self._run_refresh_sync()
-                return self._select_candidate(**kwargs)
-            raise
+                proxy = self._select_candidate(**kwargs)
+            else:
+                raise
         except PoolSaturated:
             if self.config.on_saturated is not None:
                 self.config.on_saturated()
             raise
+        if self.config.on_proxy_acquired:
+            self.config.on_proxy_acquired(proxy)
+        return proxy
 
     async def aget_next(self, **kwargs: Any) -> Proxy:
+        """Async variant of :meth:`get_next` respecting async refresh events.
+
+        Args:
+            **kwargs (Any): Same filters as :meth:`get_next`.
+
+        Returns:
+            Proxy: Selected proxy.
+
+        Raises:
+            PoolExhausted: On exhaustion or refresh timeout.
+            PoolSaturated: When limits block all matches.
+
+        Example:
+            >>> ProxyPool.aget_next.__name__
+            'aget_next'
+        """
         try:
             await asyncio.wait_for(
                 self._refresh_event_async.wait(),
@@ -346,30 +883,49 @@ class ProxyPool:
         except TimeoutError:
             raise PoolExhausted("Refresh timed out") from None
         try:
-            return self._select_candidate(**kwargs)
+            proxy = self._select_candidate(**kwargs)
         except PoolExhausted:
             if self.config.on_exhausted is not None:
                 self.config.on_exhausted()
             if self.config.arefresh_callback is not None:
                 await self._run_arefresh_async()
-                return self._select_candidate(**kwargs)
-            raise
+                proxy = self._select_candidate(**kwargs)
+            else:
+                raise
         except PoolSaturated:
             if self.config.on_saturated is not None:
                 self.config.on_saturated()
             raise
+        if self.config.on_proxy_acquired:
+            self.config.on_proxy_acquired(proxy)
+        return proxy
 
     # ------------------------------------------------------------------
     # Accounting
     # ------------------------------------------------------------------
 
     def mark_failed(self, proxy: Proxy | str, exc_type: type | None = None) -> None:
+        """Increment failure counts and optionally move *proxy* to cooldown.
+
+        Args:
+            proxy (Proxy | str): Proxy that failed.
+            exc_type (type | None): Optional exception type for penalty lookup.
+
+        Returns:
+            None
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"], PoolConfig(failure_threshold=99))
+            >>> pool.mark_failed("127.0.0.1:1") is None
+            True
+        """
         with self._lock:
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             k = self._key(p)
             count = self._failure_counts.get(k, 0) + 1
             self._failure_counts[k] = count
-            if count >= self.config.failure_threshold:
+            cooled = count >= self.config.failure_threshold
+            if cooled:
                 penalty = self.config.failure_penalties.get(exc_type, 1.0)
                 self._cooldown_until[k] = time.time() + (self.config.cooldown * penalty)
                 if isinstance(self.proxies, list):
@@ -381,25 +937,72 @@ class ProxyPool:
                     self.proxies.extend(kept)
                 self._active_keys.discard(k)
             self._index_dirty = True
+        if (cb := self.config.on_proxy_failed):
+            cb(p, exc_type)
+        if cooled and (cb_cd := self.config.on_proxy_cooled_down):
+            cb_cd(p)
 
     def mark_success(self, proxy: Proxy | str) -> None:
+        """Clear failure streak and bump success counters for *proxy*.
+
+        Args:
+            proxy (Proxy | str): Proxy that succeeded.
+
+        Returns:
+            None
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool.mark_success("127.0.0.1:1") is None
+            True
+        """
         with self._lock:
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             k = self._key(p)
+            prev_failures = self._failure_counts.get(k, 0)
             self._success_counts[k] = self._success_counts.get(k, 0) + 1
             self._failure_counts.pop(k, None)
             self._index_dirty = True
+        if prev_failures > 0 and (cb := self.config.on_proxy_recovered):
+            cb(p)
 
     # ------------------------------------------------------------------
     # Context managers
     # ------------------------------------------------------------------
 
     def __enter__(self) -> Proxy:
+        """Enter sync context: select a proxy and stash it on thread-local storage.
+
+        Returns:
+            Proxy: Acquired proxy for the ``with`` block.
+
+        Example:
+            >>> with ProxyPool(["127.0.0.1:1"]) as p:
+            ...     p.port
+            1
+        """
         proxy = self.get_next()
         self._local.proxy = proxy
         return proxy
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Exit sync context: release slot and optionally mark success/failure.
+
+        Args:
+            exc_type: Exception type if the block raised.
+            exc_val: Exception value.
+            exc_tb: Traceback.
+
+        Returns:
+            bool: ``False`` when ``config.reraise`` is ``True`` so exceptions propagate.
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> with pool:
+            ...     pass
+            >>> True
+            True
+        """
         proxy: Proxy | None = getattr(self._local, "proxy", None)
         if proxy is not None:
             self._release_active_slot(proxy)
@@ -411,12 +1014,35 @@ class ProxyPool:
         return not self.config.reraise
 
     async def __aenter__(self) -> Proxy:
+        """Enter async context: await :meth:`aget_next` and bind proxy to the current task.
+
+        Returns:
+            Proxy: Acquired proxy.
+
+        Example:
+            >>> ProxyPool.__aenter__.__name__
+            '__aenter__'
+        """
         async with self._async_lock:
             proxy = await self.aget_next()
         self._task_proxy.set(proxy)
         return proxy
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Exit async context: release accounting under the async lock.
+
+        Args:
+            exc_type: Exception type from the block, if any.
+            exc_val: Exception instance.
+            exc_tb: Traceback.
+
+        Returns:
+            bool: Suppression flag mirroring sync :meth:`__exit__`.
+
+        Example:
+            >>> ProxyPool.__aexit__.__name__
+            '__aexit__'
+        """
         proxy = self._task_proxy.get()
         if proxy is not None:
             self._release_active_slot(proxy)
@@ -433,9 +1059,27 @@ class ProxyPool:
     # ------------------------------------------------------------------
 
     def acquire(self) -> ProxyPool:
+        """Back-compat no-op returning ``self`` for ``async with pool.acquire()`` patterns.
+
+        Returns:
+            ProxyPool: This instance.
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"]).acquire() is not None
+            True
+        """
         return self
 
     def aacquire(self) -> ProxyPool:
+        """Async back-compat alias of :meth:`acquire`.
+
+        Returns:
+            ProxyPool: This instance.
+
+        Example:
+            >>> ProxyPool(["127.0.0.1:1"]).aacquire() is not None
+            True
+        """
         return self
 
     # ------------------------------------------------------------------
@@ -443,6 +1087,16 @@ class ProxyPool:
     # ------------------------------------------------------------------
 
     def reset(self) -> None:
+        """Restore the active set from prototypes and clear cooldown counters.
+
+        Returns:
+            None
+
+        Example:
+            >>> pool = ProxyPool(["127.0.0.1:1"])
+            >>> pool.reset() is None
+            True
+        """
         with self._lock:
             self.proxies = (
                 deque(self._prototypes)
@@ -461,17 +1115,48 @@ class ProxyPool:
     # ------------------------------------------------------------------
 
     def __len__(self) -> int:
+        """Return the number of currently active (non-cooldown) proxies.
+
+        Returns:
+            int: Active pool size after purging expired cooldowns.
+
+        Example:
+            >>> len(ProxyPool(["127.0.0.1:1", "127.0.0.1:2"]))
+            2
+        """
         with self._lock:
             self._purge_cooldown()
             return len(self.proxies)
 
     def __iter__(self) -> Iterator[Proxy]:
+        """Iterate a snapshot of active proxies (not live-mutating).
+
+        Returns:
+            Iterator[Proxy]: Iterator over a point-in-time copy.
+
+        Example:
+            >>> next(iter(ProxyPool(["127.0.0.1:1"]))).port
+            1
+        """
         with self._lock:
             self._purge_cooldown()
             snapshot = list(self.proxies)
         return iter(snapshot)
 
     def __contains__(self, item: object) -> bool:
+        """Return whether *item* matches an active proxy URL in the pool.
+
+        Args:
+            item (object): ``Proxy``, string, or other proxy-like value.
+
+        Returns:
+            bool: Membership in the active key set.
+
+        Example:
+            >>> p = Proxy("127.0.0.1:9")
+            >>> p in ProxyPool([p])
+            True
+        """
         try:
             key = self._key(Proxy(item) if not isinstance(item, Proxy) else item)  # type: ignore[arg-type]
         except (TypeError, ValueError):
@@ -481,6 +1166,15 @@ class ProxyPool:
             return key in self._active_keys
 
     def __repr__(self) -> str:
+        """Summarise active, cooling, strategy, structure, and cooldown seconds.
+
+        Returns:
+            str: Debug representation.
+
+        Example:
+            >>> "ProxyPool" in repr(ProxyPool(["127.0.0.1:1"]))
+            True
+        """
         with self._lock:
             self._purge_cooldown()
             active = len(self.proxies)
@@ -496,6 +1190,19 @@ def _finalize_pool_connections(
     active: dict[str, int],
     lock: threading.RLock,
 ) -> None:
+    """Clear in-flight connection counters when a :class:`ProxyPool` is garbage-collected.
+
+    Args:
+        active (dict[str, int]): Shared per-URL in-flight map.
+        lock (threading.RLock): Pool lock guarding *active*.
+
+    Returns:
+        None
+
+    Example:
+        >>> _finalize_pool_connections.__name__
+        '_finalize_pool_connections'
+    """
     with lock:
         active.clear()
 
@@ -504,4 +1211,5 @@ __all__ = [
     "ANONYMITY_RANKS",
     "PoolConfig",
     "ProxyPool",
+    "TokenBucket",
 ]

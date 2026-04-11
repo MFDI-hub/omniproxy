@@ -44,7 +44,21 @@ TOKENS_RE = re.compile(_STRUCTURAL_FIELDS_PATTERN)
 
 
 def _proxy_format_groupdict(stripped: str) -> dict[str, str | None] | None:
-    """First matching :data:`PROXY_FORMATS_REGEXP` pattern for *stripped*, or ``None``."""
+    """Return regex ``groupdict()`` for the first matching proxy pattern, if any.
+
+    Args:
+        stripped (str): Candidate proxy string (typically already stripped).
+
+    Returns:
+        dict[str, str | None] | None: Named groups from :data:`~omniproxy.constants.PROXY_FORMATS_REGEXP`,
+        or ``None`` when no pattern matches.
+
+    Example:
+        >>> from omniproxy.utils import _proxy_format_groupdict
+        >>> g = _proxy_format_groupdict("127.0.0.1:8080")
+        >>> g is not None and g.get("ip") == "127.0.0.1"
+        True
+    """
 
     for pattern in PROXY_FORMATS_REGEXP:
         match = pattern.match(stripped)
@@ -54,6 +68,28 @@ def _proxy_format_groupdict(stripped: str) -> dict[str, str | None] | None:
 
 
 class OmniproxyParser(msgspec.Struct):
+    """Lightweight :mod:`msgspec` struct produced by :meth:`from_string` / :meth:`from_match`.
+
+    Values are normalised and validated in :meth:`__post_init__` (port range, hostname or IP,
+    optional ``rotation_url`` scheme). Use :func:`get_formatted_proxy_string` with a
+    :class:`~omniproxy.proxy.ProxyPattern` to materialise canonical URL text.
+
+    Attributes
+    ----------
+    ip: :class:`str`
+        Hostname or IP. IPv6 literals are bracketed when required for URL safety.
+    port: :class:`int`
+        TCP port, strictly between ``1`` and ``65535`` inclusive.
+    protocol
+        Member of :data:`~omniproxy.constants.ALLOWED_PROTOCOLS`: ``http``, ``https``, ``socks4``, or ``socks5``.
+    username: Optional[:class:`str`]
+        Credential username when present in the parsed format.
+    password: Optional[:class:`str`]
+        Credential password when present.
+    rotation_url: Optional[:class:`str`]
+        Parsed rotation / mobile endpoint URL, if the input string carried a bracketed suffix.
+    """
+
     ip: str
     port: int
     protocol: ALLOWED_PROTOCOLS = "http"
@@ -62,6 +98,18 @@ class OmniproxyParser(msgspec.Struct):
     rotation_url: str | None = None
 
     def __post_init__(self):
+        """Validate port, host/IP, and optional rotation URL after construction.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If port, host, or rotation URL is invalid.
+
+        Example:
+            >>> OmniproxyParser(ip="1.1.1.1", port=80).port
+            80
+        """
         # 1. Port validation
         if not (0 < self.port <= 65535):
             raise ValueError(f"Port must be between 1 and 65535, got {self.port}")
@@ -103,6 +151,21 @@ class OmniproxyParser(msgspec.Struct):
 
     @classmethod
     def from_string(cls, proxy_string: str) -> OmniproxyParser:
+        """Parse a single proxy string into an :class:`OmniproxyParser` instance.
+
+        Args:
+            proxy_string (str): Raw proxy line.
+
+        Returns:
+            OmniproxyParser: Parsed, validated struct.
+
+        Raises:
+            ValueError: If the format is unsupported.
+
+        Example:
+            >>> OmniproxyParser.from_string("socks5://h:1080").protocol
+            'socks5'
+        """
         stripped = proxy_string.strip()
         groups = _proxy_format_groupdict(stripped)
         if groups is None:
@@ -111,7 +174,21 @@ class OmniproxyParser(msgspec.Struct):
 
     @classmethod
     def batch_parse(cls, lines: Iterable[str]) -> list[OmniproxyParser]:
-        """Parse each non-empty stripped line the same way as :meth:`from_string`."""
+        """Parse each non-empty stripped line the same way as :meth:`from_string`.
+
+        Args:
+            lines (Iterable[str]): Lines that may contain proxies.
+
+        Returns:
+            list[OmniproxyParser]: One entry per non-empty valid line.
+
+        Raises:
+            ValueError: On the first line with an unsupported format.
+
+        Example:
+            >>> OmniproxyParser.batch_parse(["  ", "1.1.1.1:80"])[0].ip
+            '1.1.1.1'
+        """
 
         out: list[OmniproxyParser] = []
         for line in lines:
@@ -126,6 +203,21 @@ class OmniproxyParser(msgspec.Struct):
 
     @classmethod
     def from_match(cls, groups: dict[str, str | None]) -> OmniproxyParser:
+        """Build a parser struct from a regex ``groupdict`` mapping.
+
+        Args:
+            groups (dict[str, str | None]): Named capture groups (``ip``, ``port``, etc.).
+
+        Returns:
+            OmniproxyParser: Constructed instance.
+
+        Raises:
+            ValueError: If protocol is unsupported or required groups are missing.
+
+        Example:
+            >>> OmniproxyParser.from_match({"protocol": "http", "ip": "9.9.9.9", "port": "53", "username": None, "password": None, "url": None}).port
+            53
+        """
         raw_proto = (groups.get("protocol") or "http").lower()
         if raw_proto not in ("http", "https", "socks5", "socks4"):
             raise ValueError(f"Unsupported protocol: {raw_proto!r}")
@@ -140,6 +232,18 @@ class OmniproxyParser(msgspec.Struct):
 
 
 def _collapse_pattern_after_optional_fields(pattern: str) -> str:
+    """Normalise a pattern string after removing optional username/password tokens.
+
+    Args:
+        pattern (str): Pattern containing structural field names.
+
+    Returns:
+        str: Collapsed pattern safe for token substitution.
+
+    Example:
+        >>> _collapse_pattern_after_optional_fields("http:://user@@host")
+        'http://user@host'
+    """
     s = pattern
     s = COLLAPSE_COLONS_RE.sub(":", s)
     s = s.replace(":@", "@")
@@ -154,7 +258,21 @@ def _collapse_pattern_after_optional_fields(pattern: str) -> str:
 
 
 def get_formatted_proxy_string(proxy: Proxy | OmniproxyParser, pattern: str | ProxyPattern) -> str:
-    """Render *proxy* using *pattern* field tokens (protocol, username, password, ip, port, rotation_url)."""
+    """Render *proxy* using *pattern* field tokens (protocol, username, password, ip, port, rotation_url).
+
+    Args:
+        proxy (Proxy | OmniproxyParser): Source values.
+        pattern (str | ProxyPattern): Template with allowed field tokens.
+
+    Returns:
+        str: Formatted proxy string.
+
+    Example:
+        >>> from omniproxy.utils import OmniproxyParser, get_formatted_proxy_string
+        >>> p = OmniproxyParser.from_string("http://a:b@1.1.1.1:8080")
+        >>> get_formatted_proxy_string(p, "ip:port")
+        '1.1.1.1:8080'
+    """
 
     if isinstance(proxy, OmniproxyParser):
         dumped = msgspec.structs.asdict(proxy)

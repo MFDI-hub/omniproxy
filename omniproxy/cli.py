@@ -9,6 +9,19 @@ from .backends.factory import supported_backends
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for ``check`` and ``scrape`` subcommands.
+
+    Args:
+        argv (list[str] | None): Arguments (excluding program name); ``None`` uses ``sys.argv``.
+
+    Returns:
+        int: Process exit code (``0`` on success).
+
+    Example:
+        >>> from omniproxy.cli import main
+        >>> isinstance(main.__doc__, str)
+        True
+    """
     backend_help = " | ".join(supported_backends())
     parser = argparse.ArgumentParser(prog="omniproxy", description="Proxy string utilities")
     sub = parser.add_subparsers(dest="cmd", required=True)
