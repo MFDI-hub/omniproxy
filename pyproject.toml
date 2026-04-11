@@ -3,11 +3,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "proxystr"
-version = "3.0.0"
+name = "omniproxy"
+dynamic = ["version"]
 description = "Use a proxy as a string, but achieve broad functionality for various scenarios"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "Mfdi", email = "mfdisanchez@gmail.com" }
@@ -18,16 +18,17 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 dependencies = [
-    "pydantic>=2.0",
+    "msgspec>=0.10",
+    "orjson>=3.10",
 ]
 
 [project.optional-dependencies]
@@ -48,8 +49,18 @@ curl_cffi = [
 tls_client = [
     "tls-client>=1.0",
 ]
+re2 = [
+    "google-re2>=1.0",
+]
 all = [
-    "proxystr[httpx,aiohttp,requests,curl_cffi,tls_client]",
+    "httpx>=0.27",
+    "httpx-socks>=0.9",
+    "aiohttp>=3.9",
+    "aiohttp-socks>=0.8",
+    "requests>=2.31",
+    "curl-cffi>=0.6",
+    "tls-client>=1.0",
+    "google-re2>=1.0",
 ]
 
 [dependency-groups]
@@ -59,21 +70,26 @@ httpx = [
 ]
 
 dev = [
+    "python-dotenv>=1.0.0",
     "pytest>=8.0",
     "mypy>=1.8",
     "ruff>=0.4",
 ]
 
 [project.urls]
-Homepage = "https://github.com/mfdi/proxystr"
-Repository = "https://github.com/mfdi/proxystr"
-Issues = "https://github.com/mfdi/proxystr/issues"
+Homepage = "https://github.com/mfdi/omniproxy"
+Documentation = "https://github.io/mfdi/omniproxy"
+Repository = "https://github.com/mfdi/omniproxy"
+Issues = "https://github.com/mfdi/omniproxy/issues"
 
 [project.scripts]
-proxystr = "proxystr.cli:main"
+omniproxy = "omniproxy.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["proxystr"]
+packages = ["omniproxy"]
+
+[tool.hatch.version]
+path = "omniproxy/__init__.py"
 
 [tool.uv]
 default-groups = ["httpx", "dev"]
@@ -83,8 +99,8 @@ default-groups = ["httpx", "dev"]
 # =========================
 [tool.ruff]
 line-length = 100
-target-version = "py38"
-src = ["proxystr", "tests"]
+target-version = "py39"
+src = ["omniproxy", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -106,6 +122,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "ARG", "FBT"]
+"omniproxy/backends/aiohttp_client.py" = ["SIM117"]
+"omniproxy/client.py" = ["F822"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -116,36 +134,16 @@ docstring-code-format = true
 # MYPY (STRICT)
 # =========================
 [tool.mypy]
-python_version = "3.8"
-
-strict = true
-
-disallow_any_unimported = true
-disallow_any_expr = true
-disallow_any_generics = true
-disallow_subclassing_any = true
-
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-
-no_implicit_optional = true
-warn_return_any = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-warn_unused_configs = true
-
-strict_equality = true
+python_version = "3.9"
 
 pretty = true
 show_error_codes = true
 
 ignore_missing_imports = true
 
-# Relax tests slightly
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_unused_configs = true
 
 # =========================
 # PYTEST

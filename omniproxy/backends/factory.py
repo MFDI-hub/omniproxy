@@ -4,18 +4,26 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..constants import SUPPORTED_BACKENDS
 from .base import BaseBackend
 
 if TYPE_CHECKING:
     pass
 
 
-def get_backend(name: str | None = None) -> BaseBackend:
-    from .. import config
+def supported_backends() -> tuple[str, ...]:
+    """Stable names accepted by :func:`get_backend` (aliases normalized)."""
+    return SUPPORTED_BACKENDS
 
-    key = (name or config.default_backend).lower().replace("-", "_")
+
+def get_backend(name: str | None = None) -> BaseBackend:
+    from ..config import settings
+
+    key = (name or settings.default_backend).lower().replace("-", "_")
     if key in ("curlcffi", "curl-cffi"):
         key = "curl_cffi"
+    if key == "tlsclient":
+        key = "tls_client"
 
     if key == "httpx":
         try:
@@ -23,7 +31,7 @@ def get_backend(name: str | None = None) -> BaseBackend:
 
             return HttpxBackend()
         except ImportError as e:
-            raise ImportError("Install with 'uv add proxystr --extra httpx'") from e
+            raise ImportError("Install with 'uv add omniproxy --extra httpx'") from e
 
     if key == "aiohttp":
         try:
@@ -31,7 +39,7 @@ def get_backend(name: str | None = None) -> BaseBackend:
 
             return AiohttpBackend()
         except ImportError as e:
-            raise ImportError("Install with 'uv add proxystr --extra aiohttp'") from e
+            raise ImportError("Install with 'uv add omniproxy --extra aiohttp'") from e
 
     if key == "requests":
         try:
@@ -39,7 +47,7 @@ def get_backend(name: str | None = None) -> BaseBackend:
 
             return RequestsBackend()
         except ImportError as e:
-            raise ImportError("Install with 'uv add proxystr --extra requests'") from e
+            raise ImportError("Install with 'uv add omniproxy --extra requests'") from e
 
     if key == "curl_cffi":
         try:
@@ -47,7 +55,7 @@ def get_backend(name: str | None = None) -> BaseBackend:
 
             return CurlBackend()
         except ImportError as e:
-            raise ImportError("Install with 'uv add proxystr --extra curl_cffi'") from e
+            raise ImportError("Install with 'uv add omniproxy --extra curl_cffi'") from e
 
     if key == "tls_client":
         try:
@@ -55,6 +63,8 @@ def get_backend(name: str | None = None) -> BaseBackend:
 
             return TlsClientBackend()
         except ImportError as e:
-            raise ImportError("Install with 'uv add proxystr --extra tls_client'") from e
+            raise ImportError("Install with 'uv add omniproxy --extra tls_client'") from e
 
-    raise ValueError(f"Unknown backend {name!r}; choose httpx, aiohttp, requests, curl_cffi, tls_client")
+    raise ValueError(
+        f"Unknown backend {name!r}; choose {', '.join(SUPPORTED_BACKENDS)}"
+    )

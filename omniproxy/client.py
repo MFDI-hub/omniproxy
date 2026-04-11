@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .backends.httpx_client import AsyncClient, Client
+
 
 def __getattr__(name: str):
     if name == "Client":

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
+
+from ..constants import DEFAULT_BACKEND_TIMEOUT
 
 if TYPE_CHECKING:
     from ..proxy import Proxy
@@ -31,7 +34,7 @@ class BaseBackend(ABC):
         url: str,
         proxy: Proxy,
         *,
-        timeout: float = 10.0,
+        timeout: float = DEFAULT_BACKEND_TIMEOUT,
         **kwargs: Any,
     ) -> BackendResponse: ...
 
@@ -41,6 +44,28 @@ class BaseBackend(ABC):
         url: str,
         proxy: Proxy,
         *,
-        timeout: float = 10.0,
+        timeout: float = DEFAULT_BACKEND_TIMEOUT,
         **kwargs: Any,
     ) -> BackendResponse: ...
+
+    @abstractmethod
+    def request_direct(
+        self,
+        method: str,
+        url: str,
+        *,
+        timeout: float = DEFAULT_BACKEND_TIMEOUT,
+        **kwargs: Any,
+    ) -> BackendResponse:
+        """HTTP request without a proxy (e.g. mobile rotation URL)."""
+
+    @abstractmethod
+    async def arequest_direct(
+        self,
+        method: str,
+        url: str,
+        *,
+        timeout: float = DEFAULT_BACKEND_TIMEOUT,
+        **kwargs: Any,
+    ) -> BackendResponse:
+        """Async HTTP request without a proxy."""

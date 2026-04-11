@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
-import httpx
-from httpx_socks import AsyncProxyTransport, SyncProxyTransport
+import httpx  # type: ignore
+from httpx_socks import AsyncProxyTransport, SyncProxyTransport  # type: ignore
 
+from ..constants import DEFAULT_BACKEND_TIMEOUT
 from ..proxy import Proxy
 from .base import BackendResponse, BaseBackend
 
 
 class Client(httpx.Client):
-    def __init__(
-        self, *args, proxy: Proxy | str | None = None, follow_redirects=True, **kwargs
-    ):
+    def __init__(self, *args, proxy: Proxy | str | None = None, follow_redirects=True, **kwargs):
         if proxy:
             proxy = Proxy(proxy)
             if "http" in proxy.protocol:
@@ -27,9 +27,7 @@ class Client(httpx.Client):
 
 
 class AsyncClient(httpx.AsyncClient):
-    def __init__(
-        self, *args, proxy: Proxy | str | None = None, follow_redirects=True, **kwargs
-    ):
+    def __init__(self, *args, proxy: Proxy | str | None = None, follow_redirects=True, **kwargs):
         if proxy:
             proxy = Proxy(proxy)
             if "http" in proxy.protocol:
@@ -45,26 +43,38 @@ class HttpxBackend(BaseBackend):
     name = "httpx"
 
     def get(
-        self, url: str, proxy: Proxy, *, timeout: float = 10.0, **kwargs: Any
+        self, url: str, proxy: Proxy, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
     ) -> BackendResponse:
         with Client(proxy=proxy, timeout=timeout, **kwargs) as client:
             r = client.get(url)
             return self._from_httpx_response(r)
 
     async def aget(
-        self, url: str, proxy: Proxy, *, timeout: float = 10.0, **kwargs: Any
+        self, url: str, proxy: Proxy, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
     ) -> BackendResponse:
         async with AsyncClient(proxy=proxy, timeout=timeout, **kwargs) as client:
             r = await client.get(url)
             return self._from_httpx_response(r)
 
+    def request_direct(
+        self, method: str, url: str, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
+    ) -> BackendResponse:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            r = client.request(method.upper(), url, **kwargs)
+            return self._from_httpx_response(r)
+
+    async def arequest_direct(
+        self, method: str, url: str, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
+    ) -> BackendResponse:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            r = await client.request(method.upper(), url, **kwargs)
+            return self._from_httpx_response(r)
+
     @staticmethod
     def _from_httpx_response(r: httpx.Response) -> BackendResponse:
         jd = None
-        try:
+        with contextlib.suppress(Exception):
             jd = r.json()
-        except Exception:
-            pass
         return BackendResponse(
             status_code=r.status_code,
             headers=dict(r.headers),

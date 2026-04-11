@@ -177,4 +177,6 @@ cache/
 
 # Custom projects
 
-
+rust/
+scripts/
+testingoutsmth.py

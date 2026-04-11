@@ -4,16 +4,17 @@ import unittest
 
 import httpx
 import python_socks
+from omniproxy import Proxy, acheck_proxies, acheck_proxy, check_proxies, check_proxy
 
-from proxystr import Proxy, acheck_proxies, acheck_proxy, check_proxies, check_proxy
-
-# Set PROXYSTR_LIVE_TESTS=1 when REAL_* credentials point at working proxies.
-LIVE = os.environ.get("PROXYSTR_LIVE_TESTS") == "1"
-
-REAL_HTTP_PROXY = "your_real_http_proxy_in_any_format"
-REAL_SOCKS5_PROXY = "socks5://your_real_socks5_proxy_in_any_format"
-REAL_HTTP_PROXY = "bAgVACbi:fZhLpcBy@212.193.182.47:64876"
-REAL_SOCKS5_PROXY = "socks5://84.246.87.118:49347:bAgVACbi:fZhLpcBy"
+# Set OMNIPROXY_LIVE_TESTS=1 and provide REAL_HTTP_PROXY / REAL_SOCKS5_PROXY
+# in the environment when running live integration checks.
+REAL_HTTP_PROXY = os.environ.get("REAL_HTTP_PROXY", "127.0.0.1:8080")
+REAL_SOCKS5_PROXY = os.environ.get("REAL_SOCKS5_PROXY", "socks5://127.0.0.1:1080")
+LIVE = (
+    os.environ.get("OMNIPROXY_LIVE_TESTS") == "1"
+    and bool(os.environ.get("REAL_HTTP_PROXY", "").strip())
+    and bool(os.environ.get("REAL_SOCKS5_PROXY", "").strip())
+)
 
 _SOCKS_FAIL_ERRORS = (
     python_socks._errors.ProxyConnectionError,
@@ -33,24 +34,36 @@ class TestCheck(unittest.TestCase):
     def tearDown(self):
         self.loop.close()
 
-    @unittest.skipUnless(LIVE, "Set PROXYSTR_LIVE_TESTS=1 for live proxy checks")
+    @unittest.skipUnless(
+        LIVE,
+        "Set OMNIPROXY_LIVE_TESTS=1 and REAL_HTTP_PROXY/REAL_SOCKS5_PROXY for live checks",
+    )
     def test_proxy_get_info(self):
         self.assertTrue(isinstance(self.p.get_info(), dict))
         self.assertTrue(isinstance(asyncio.run(self.p.aget_info()), dict))
 
-    @unittest.skipUnless(LIVE, "Set PROXYSTR_LIVE_TESTS=1 for live proxy checks")
+    @unittest.skipUnless(
+        LIVE,
+        "Set OMNIPROXY_LIVE_TESTS=1 and REAL_HTTP_PROXY/REAL_SOCKS5_PROXY for live checks",
+    )
     def test_proxy_check(self):
         self.assertTrue(self.p.check())
         self.assertTrue(asyncio.run(self.p.acheck()))
 
-    @unittest.skipUnless(LIVE, "Set PROXYSTR_LIVE_TESTS=1 for live proxy checks")
+    @unittest.skipUnless(
+        LIVE,
+        "Set OMNIPROXY_LIVE_TESTS=1 and REAL_HTTP_PROXY/REAL_SOCKS5_PROXY for live checks",
+    )
     def test_check_proxy(self):
         self.assertTrue(check_proxy(self.p)[1])
         self.assertTrue(check_proxy(self.sp)[1])
         self.assertTrue(isinstance(check_proxy(self.p, with_info=True)[1], dict))
         self.assertTrue(isinstance(check_proxy(self.sp, with_info=True)[1], dict))
 
-    @unittest.skipUnless(LIVE, "Set PROXYSTR_LIVE_TESTS=1 for live proxy checks")
+    @unittest.skipUnless(
+        LIVE,
+        "Set OMNIPROXY_LIVE_TESTS=1 and REAL_HTTP_PROXY/REAL_SOCKS5_PROXY for live checks",
+    )
     def test_acheck_proxy(self):
         tasks = [
             acheck_proxy(self.p),
@@ -64,7 +77,10 @@ class TestCheck(unittest.TestCase):
         self.assertTrue(isinstance(r[2][1], dict))
         self.assertTrue(isinstance(r[3][1], dict))
 
-    @unittest.skipUnless(LIVE, "Set PROXYSTR_LIVE_TESTS=1 for live proxy checks")
+    @unittest.skipUnless(
+        LIVE,
+        "Set OMNIPROXY_LIVE_TESTS=1 and REAL_HTTP_PROXY/REAL_SOCKS5_PROXY for live checks",
+    )
     def test_acheck_proxies(self):
         tasks = [
             acheck_proxies([self.p]),
@@ -75,12 +91,17 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(r[1][0][0][0], self.sp)
         self.assertTrue(isinstance(r[1][0][0][1], dict))
 
-    @unittest.skipUnless(LIVE, "Set PROXYSTR_LIVE_TESTS=1 for live proxy checks")
+    @unittest.skipUnless(
+        LIVE,
+        "Set OMNIPROXY_LIVE_TESTS=1 and REAL_HTTP_PROXY/REAL_SOCKS5_PROXY for live checks",
+    )
     def test_check_proxies(self):
         self.assertEqual(check_proxies([self.p])[0][0], self.p)
         self.assertEqual(check_proxies([self.sp], use_async=False)[0][0], self.sp)
         self.assertTrue(isinstance(check_proxies([self.p], with_info=True)[0][0][1], dict))
-        self.assertTrue(isinstance(check_proxies([self.sp], with_info=True, use_async=False)[0][0][1], dict))
+        self.assertTrue(
+            isinstance(check_proxies([self.sp], with_info=True, use_async=False)[0][0][1], dict)
+        )
 
     def test_fail_check_proxy(self):
         quick = 3.0
@@ -95,7 +116,9 @@ class TestCheck(unittest.TestCase):
     def test_fail_acheck_proxy(self):
         quick = 3.0
         r = self.loop.run_until_complete(
-            asyncio.gather(acheck_proxy(self.fp, timeout=quick), acheck_proxy(self.fsp, timeout=quick))
+            asyncio.gather(
+                acheck_proxy(self.fp, timeout=quick), acheck_proxy(self.fsp, timeout=quick)
+            )
         )
         self.assertFalse(r[0][1])
         self.assertFalse(r[1][1])
