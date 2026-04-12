@@ -1,6 +1,12 @@
 from .backends import get_backend, supported_backends
 from .config import settings
-from .errors import MissingProxyMetadata, NoMatchingProxy, PoolExhausted, PoolSaturated
+from .errors import (
+    MissingProxyMetadata,
+    NoMatchingProxy,
+    PoolClosedError,
+    PoolExhausted,
+    PoolSaturated,
+)
 from .extended_proxy import (
     CheckResult,
     Proxy,
@@ -21,6 +27,7 @@ __all__ = [
     "MissingProxyMetadata",
     "NoMatchingProxy",
     "PlaywrightProxySettings",
+    "PoolClosedError",
     "PoolExhausted",
     "PoolSaturated",
     "Proxy",

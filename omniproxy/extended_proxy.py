@@ -87,7 +87,9 @@ def _pick_rotated_default_url(
         str: URL string to request.
 
     Example:
-        >>> isinstance(_pick_rotated_default_url(with_info=False, fields="", attempt=0, last_url=None), str)
+        >>> isinstance(
+        ...     _pick_rotated_default_url(with_info=False, fields="", attempt=0, last_url=None), str
+        ... )
         True
     """
     templates = (
@@ -789,7 +791,7 @@ def check_proxies(
             tuple[Any, Any]: ``(proxy, result)`` pair from :func:`check_proxy`.
 
         Example:
-            >>> check_proxies.__name__
+            >>> check_proxies._one
             'check_proxies'
         """
         return check_proxy(

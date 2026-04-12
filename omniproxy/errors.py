@@ -77,3 +77,17 @@ class MissingProxyMetadata(ProxyPoolError):
     args: :class:`tuple`
         Message identifies the proxy (often :attr:`~omniproxy.proxy.Proxy.safe_url`) and missing key.
     """
+
+
+class PoolClosedError(RuntimeError):
+    """Raised when a closed :class:`~omniproxy.pool.ProxyPool` rejects new work (clean lifecycle).
+
+    This is a :class:`RuntimeError` subclass so callers that broadly catch ``Exception`` still see
+    shutdown as distinct from :exc:`PoolExhausted` / :exc:`PoolSaturated`, while ``BaseException``
+    handlers remain unaffected.
+
+    Attributes
+    ----------
+    args: :class:`tuple`
+        Human-readable reason (typically ``"proxy pool is closed"``).
+    """

@@ -168,6 +168,12 @@ class PoolConfig:
     refresh_timeout: float = 10.0
     """Max seconds to wait for an in-flight refresh before failing with :exc:`PoolExhausted`."""
 
+    wait_fallback_interval: float = 0.25
+    """Seconds to sleep on a coordination :class:`threading.Condition` wait when no cooldown deadline applies."""
+
+    acquire_timeout: float = 0.0
+    """Total seconds to retry :exc:`PoolSaturated` acquisition before re-raising. ``0`` disables waiting."""
+
     # --- context-manager behaviour ---
     auto_mark_failed_on_exception: bool = True
     """If True, context managers call ``mark_failed`` when the block raises an exception."""
