@@ -18,7 +18,7 @@ from .extended_proxy import (
 )
 from .io import fetch_proxies, iter_proxies_from_file, read_proxies, save_proxies
 from .pool import ProxyPool
-from .proxy import PlaywrightProxySettings, ProxyPattern
+from .proxy import PlaywrightProxySettings, ProxyPattern, SimpleProxy
 
 __all__ = [
     "AsyncClient",
@@ -33,6 +33,7 @@ __all__ = [
     "Proxy",
     "ProxyPattern",
     "ProxyPool",
+    "SimpleProxy",
     "acheck_proxies",
     "acheck_proxy",
     "apply_check_result_metadata",

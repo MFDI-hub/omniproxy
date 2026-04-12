@@ -18,7 +18,7 @@ from .constants import (
     DEFAULT_RETRYABLE_HTTP_STATUSES,
     URL_HEADERS_PROBE,
 )
-from .proxy import Proxy as BaseProxy
+from .proxy import SimpleProxy
 
 if TYPE_CHECKING:
     from .client import AsyncClient, Client
@@ -185,7 +185,7 @@ class CheckResult:
 
 
 def apply_check_result_metadata(
-    proxy: BaseProxy,
+    proxy: SimpleProxy,
     *,
     latency: float | None,
     anonymity: str | None,
@@ -198,7 +198,7 @@ def apply_check_result_metadata(
     """Write check metadata fields onto a :class:`Proxy` instance.
 
     Args:
-        proxy (BaseProxy): Target proxy (must support :meth:`~omniproxy.proxy.Proxy._set_attribute`).
+        proxy (SimpleProxy): Target proxy (must support :meth:`~omniproxy.proxy.Proxy._set_attribute`).
         latency (float | None): Observed latency.
         anonymity (str | None): Classified anonymity label, if known.
         status (bool): ``last_status`` flag for this check.
@@ -232,7 +232,7 @@ def apply_check_result_metadata(
         proxy._set_attribute("org", org)
 
 
-class Proxy(BaseProxy):
+class Proxy(SimpleProxy):
     """Public subclass of :class:`~omniproxy.proxy.Proxy` used throughout omniproxy I/O and pooling.
 
     Adds convenience wrappers around :func:`check_proxy`, :func:`acheck_proxy`, and JSON **info**

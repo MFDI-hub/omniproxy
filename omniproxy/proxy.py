@@ -89,7 +89,7 @@ class ProxyPattern(str):
         return str.__new__(cls, pattern)
 
 
-class Proxy(str):
+class SimpleProxy(str):
     """Immutable subclass of :class:`str` representing one proxy endpoint.
 
     The value of the string is the canonical URL produced from parsed structural fields using
@@ -167,7 +167,7 @@ class Proxy(str):
     # Frozen at class body: structural + metadata names guarded by __setattr__
     _protected_attributes: frozenset[str] = frozenset(_structural_attributes + _metadata_attributes)
 
-    def __new__(cls, proxy: str | Proxy, /, protocol: str | None = None) -> Proxy:
+    def __new__(cls, proxy: str | SimpleProxy, /, protocol: str | None = None) -> SimpleProxy:
         """Create a :class:`Proxy` from a string or existing instance, optionally changing protocol.
 
         Args:
@@ -185,7 +185,7 @@ class Proxy(str):
             'socks5'
         """
         # 1. FAST PATH
-        if isinstance(proxy, Proxy):
+        if isinstance(proxy, SimpleProxy):
             if protocol is None or protocol.lower() == (proxy.protocol or "").lower():
                 return proxy
 
@@ -543,7 +543,7 @@ class Proxy(str):
         cls.default_pattern = ProxyPattern(pattern)
 
     @classmethod
-    def validate(cls, v: str) -> Proxy:
+    def validate(cls, v: str) -> SimpleProxy:
         """Parse *v* or raise ``ValueError`` with the original error chained.
 
         Args:
@@ -601,7 +601,7 @@ class Proxy(str):
             >>> Proxy("127.0.0.1:1") == "http://127.0.0.1:1"
             True
         """
-        if isinstance(other, Proxy):
+        if isinstance(other, SimpleProxy):
             return self.url == other.url
         if isinstance(other, str):
             return self.url == other
@@ -636,7 +636,7 @@ class Proxy(str):
             )
         return super().__setattr__(key, value)
 
-    def __reduce__(self) -> tuple[type[Proxy], tuple[str], dict[str, Any]]:
+    def __reduce__(self) -> tuple[type[SimpleProxy], tuple[str], dict[str, Any]]:
         """Pickle support: reconstruct from URL plus metadata state dict.
 
         Returns:
@@ -668,4 +668,4 @@ class Proxy(str):
             object.__setattr__(self, key, value)
 
 
-__all__ = ["PlaywrightProxySettings", "Proxy", "ProxyPattern"]
+__all__ = ["PlaywrightProxySettings", "ProxyPattern", "SimpleProxy"]
