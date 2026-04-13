@@ -27,7 +27,7 @@ OMNIPROXY_CONFIG_PUBLIC_KEYS: frozenset[str] = frozenset(
     }
 )
 
-DEFAULT_BACKEND: str = "httpx"
+DEFAULT_BACKEND: str = "curl_cffi"
 DEFAULT_TIMEOUT: float = 10.0
 DEFAULT_CHECK_URLS: tuple[str, ...] = ("https://api.ipify.org/?format=json",)
 DEFAULT_CHECK_INFO_URL_TEMPLATES: tuple[str, ...] = ("http://ip-api.com/json/?fields={fields}",)
