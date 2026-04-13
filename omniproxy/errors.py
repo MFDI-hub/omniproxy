@@ -45,8 +45,8 @@ class PoolExhausted(ProxyPoolError):
 class PoolSaturated(ProxyPoolError):
     """Raised when candidate proxies exist for the given filters but all are blocked by limits.
 
-    Triggers when every matching URL is at ``max_connections_per_proxy`` **or** fails the
-    per-URL RPS token bucket (:class:`TokenBucket`).
+    Triggers when every matching URL is at :attr:`~omniproxy.config.LimitsConfig.max_connections_per_proxy`
+    **or** fails the per-URL RPS token bucket (:class:`~omniproxy.pool.TokenBucket`).
 
     Attributes
     ----------

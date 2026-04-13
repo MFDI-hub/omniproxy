@@ -31,7 +31,7 @@ class HealthCheckConfig:
 
     When stored on :attr:`PoolConfig.health_check`, :class:`~omniproxy.pool.ProxyPool` can run
     :meth:`~omniproxy.pool.ProxyPool.start_monitoring` (or the threaded variant) to re-check
-    proxies on a timer and call :attr:`PoolConfig.on_check_complete`, then :meth:`~omniproxy.pool.ProxyPool.mark_success`
+    proxies on a timer and call :attr:`PoolConfig.hooks.on_check_complete`, then :meth:`~omniproxy.pool.ProxyPool.mark_success`
     or :meth:`~omniproxy.pool.ProxyPool.mark_failed` depending on the :class:`CheckResult`.
 
     Attributes
@@ -69,11 +69,69 @@ class HealthCheckConfig:
 
 
 @dataclass(slots=True)
+class LimitsConfig:
+    """Concurrency and per-URL selection rate caps for :class:`PoolConfig`.
+
+    Mounted at :attr:`PoolConfig.limits` and read by :class:`~omniproxy.pool.ProxyPool` when choosing
+    the next proxy.
+
+    Attributes
+    ----------
+    max_connections_per_proxy: Optional[:class:`int`]
+        If set, caps concurrent in-flight uses per canonical proxy URL (context managers count).
+    max_rps_per_proxy: Optional[:class:`float`]
+        If set, token-bucket limit on **selections** per URL (requests per second), not HTTP RPS.
+    """
+
+    max_connections_per_proxy: int | None = None
+    max_rps_per_proxy: float | None = None
+
+
+@dataclass(slots=True)
+class LifecycleHooks:
+    """Optional callbacks for pool saturation, exhaustion, proxy accounting, and health probes.
+
+    Mounted at :attr:`PoolConfig.hooks` and invoked by :class:`~omniproxy.pool.SyncProxyPool` /
+    :class:`~omniproxy.pool.AsyncProxyPool`.
+
+    Attributes
+    ----------
+    on_saturated: Optional[Callable[[], None]]
+        When proxies match filters but every match is at connection or RPS limits (:exc:`~omniproxy.errors.PoolSaturated`).
+    on_exhausted: Optional[Callable[[], None]]
+        When the active set is empty before attempting :attr:`PoolConfig.refresh_callback` /
+        :attr:`PoolConfig.arefresh_callback`.
+    on_proxy_failed: Optional[Callable]
+        ``(proxy, exc_type | None)`` after accounting for a failure.
+    on_proxy_cooled_down: Optional[Callable]
+        ``(proxy)`` when a proxy moves to cooldown.
+    on_proxy_recovered: Optional[Callable]
+        ``(proxy)`` when a proxy returns from cooldown or failure streak clears.
+    on_check_complete: Optional[Callable]
+        ``(proxy, check_result)`` after each health probe in the background loop.
+    on_proxy_acquired: Optional[Callable]
+        ``(proxy)`` after a successful :meth:`~omniproxy.pool.ProxyPool.get_next` / :meth:`~omniproxy.pool.ProxyPool.aget_next`.
+    on_proxy_released: Optional[Callable]
+        ``(proxy)`` when a context manager releases the in-flight slot.
+    """
+
+    on_saturated: Callable[[], None] | None = None
+    on_exhausted: Callable[[], None] | None = None
+    on_proxy_failed: Callable[[Proxy, type | None], None] | None = None
+    on_proxy_cooled_down: Callable[[Proxy], None] | None = None
+    on_proxy_recovered: Callable[[Proxy], None] | None = None
+    on_check_complete: Callable[[Proxy, CheckResult], None] | None = None
+    on_proxy_acquired: Callable[[Proxy], None] | None = None
+    on_proxy_released: Callable[[Proxy], None] | None = None
+
+
+@dataclass(slots=True)
 class PoolConfig:
     """Centralised knobs for :class:`~omniproxy.pool.ProxyPool` selection, limits, and lifecycle hooks.
 
-    Most fields are optional callbacks or limits; defaults favour round-robin over a :class:`collections.deque`
-    with a fixed cooldown after repeated failures. Pair with :class:`HealthCheckConfig` for background probes.
+    Related options are grouped on :attr:`limits` and :attr:`hooks`; defaults favour round-robin over
+    a :class:`collections.deque` with a fixed cooldown after repeated failures. Pair with
+    :class:`HealthCheckConfig` for background probes.
 
     Attributes
     ----------
@@ -88,16 +146,12 @@ class PoolConfig:
     failure_penalties: :class:`dict` [:class:`type`, :class:`float`]
         Maps exception **types** to multipliers applied to :attr:`cooldown` when that type caused
         :meth:`~omniproxy.pool.ProxyPool.mark_failed`.
-    max_connections_per_proxy: Optional[:class:`int`]
-        If set, caps concurrent in-flight uses per canonical proxy URL (context managers count).
-    max_rps_per_proxy: Optional[:class:`float`]
-        If set, token-bucket limit on **selections** per URL (requests per second), not HTTP RPS.
-    on_saturated: Optional[Callable[[], None]]
-        Invoked when proxies match filters but every match is at connection or RPS limits (:exc:`~omniproxy.errors.PoolSaturated`).
+    limits: :class:`LimitsConfig`
+        :attr:`LimitsConfig.max_connections_per_proxy` and :attr:`LimitsConfig.max_rps_per_proxy`.
+    hooks: :class:`LifecycleHooks`
+        All ``on_*`` callbacks (saturation, exhaustion, acquisition, health, failure / recovery).
     filter_missing_metadata
         ``skip`` (exclude proxy), ``raise`` (:exc:`~omniproxy.errors.MissingProxyMetadata`), or ``include`` when metadata needed by filters is absent.
-    on_exhausted: Optional[Callable[[], None]]
-        Called when the active set is empty before attempting :attr:`refresh_callback` / :attr:`arefresh_callback`.
     refresh_callback
         Optional callable returning ``list`` of :class:`~omniproxy.extended_proxy.Proxy` or ``str``
         to merge when the pool is exhausted synchronously.
@@ -117,18 +171,6 @@ class PoolConfig:
         Reserved extension bag for forward-compatible options.
     health_check: Optional[:class:`HealthCheckConfig`]
         When set, enables :meth:`~omniproxy.pool.ProxyPool.start_monitoring` / threaded monitoring.
-    on_proxy_failed: Optional[Callable]
-        ``(proxy, exc_type | None)`` after accounting for a failure.
-    on_proxy_cooled_down: Optional[Callable]
-        ``(proxy)`` when a proxy moves to cooldown.
-    on_proxy_recovered: Optional[Callable]
-        ``(proxy)`` when a proxy returns from cooldown or failure streak clears.
-    on_check_complete: Optional[Callable]
-        ``(proxy, check_result)`` after each health probe in the background loop.
-    on_proxy_acquired: Optional[Callable]
-        ``(proxy)`` after a successful :meth:`~omniproxy.pool.ProxyPool.get_next` / :meth:`~omniproxy.pool.ProxyPool.aget_next`.
-    on_proxy_released: Optional[Callable]
-        ``(proxy)`` when a context manager releases the in-flight slot.
     """
 
     strategy: Strategy = "round_robin"
@@ -144,20 +186,14 @@ class PoolConfig:
     failure_penalties: dict[type, float] = field(default_factory=dict)
     """Multiply cooldown duration by ``failure_penalties.get(exc_type, 1.0)`` when marking failed."""
 
-    max_connections_per_proxy: int | None = None
-    """If set, cap concurrent in-flight uses per proxy URL (see :meth:`ProxyPool.get_next`)."""
+    limits: LimitsConfig = field(default_factory=LimitsConfig)
+    """Per-proxy connection and RPS caps (see :class:`LimitsConfig`)."""
 
-    max_rps_per_proxy: float | None = None
-    """If set, token-bucket cap on selections per proxy URL (requests per second)."""
-
-    on_saturated: Callable[[], None] | None = None
-    """Called when matching proxies exist but all are at the connection limit."""
+    hooks: LifecycleHooks = field(default_factory=LifecycleHooks)
+    """Lifecycle callbacks (see :class:`LifecycleHooks`)."""
 
     filter_missing_metadata: Literal["skip", "raise", "include"] = "skip"
     """How to treat proxies missing metadata required by a filter (e.g. ``min_anonymity``)."""
-
-    on_exhausted: Callable[[], None] | None = None
-    """Called when :meth:`ProxyPool.get_next` / :meth:`ProxyPool.aget_next` exhausts the active set."""
 
     refresh_callback: Callable[[], list[Proxy | str]] | None = None
     """Sync callback returning new proxies to merge when the pool is exhausted."""
@@ -193,13 +229,6 @@ class PoolConfig:
 
     health_check: HealthCheckConfig | None = None
     """Health check configuration."""
-
-    on_proxy_failed: Callable[[Proxy, type | None], None] | None = None
-    on_proxy_cooled_down: Callable[[Proxy], None] | None = None
-    on_proxy_recovered: Callable[[Proxy], None] | None = None
-    on_check_complete: Callable[[Proxy, CheckResult], None] | None = None
-    on_proxy_acquired: Callable[[Proxy], None] | None = None
-    on_proxy_released: Callable[[Proxy], None] | None = None
 
 
 class OmniproxyConfig:
@@ -456,4 +485,11 @@ class OmniproxyConfig:
 settings = OmniproxyConfig()
 
 
-__all__ = ["OmniproxyConfig", "settings"]
+__all__ = [
+    "HealthCheckConfig",
+    "LifecycleHooks",
+    "LimitsConfig",
+    "OmniproxyConfig",
+    "PoolConfig",
+    "settings",
+]

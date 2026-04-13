@@ -17,7 +17,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
-from .config import PoolConfig, Strategy
+from .config import LifecycleHooks, LimitsConfig, PoolConfig, Strategy
 from .constants import ANONYMITY_RANKS
 from .errors import (
     MissingProxyMetadata,
@@ -82,7 +82,7 @@ class AsyncPoolProtocol(BasePoolProtocol, Protocol):
 
 @dataclass(slots=True)
 class TokenBucket:
-    """Per-URL token bucket used internally when :attr:`PoolConfig.max_rps_per_proxy` is set.
+    """Per-URL token bucket used internally when :attr:`PoolConfig.limits.max_rps_per_proxy` is set.
 
     Instances are created lazily inside :meth:`_PoolState._nolock_consume_token` and mutated on each
     successful token acquisition.
@@ -178,7 +178,7 @@ class _PoolState:
                 restored_proxies.append(p)
         if restored_proxies:
             self._index_dirty = True
-        if restored_proxies and (cb := self.config.on_proxy_recovered):
+        if restored_proxies and (cb := self.config.hooks.on_proxy_recovered):
             for rp in restored_proxies:
                 cb(rp)
 
@@ -254,7 +254,7 @@ class _PoolState:
         return candidates[start:] + candidates[:start]
 
     def _nolock_consume_token(self, k: str) -> bool:
-        rps = self.config.max_rps_per_proxy
+        rps = self.config.limits.max_rps_per_proxy
         if rps is None or rps <= 0:
             return True
         if self._token_buckets is None:
@@ -296,7 +296,7 @@ class _PoolState:
             raise NoMatchingProxy("No proxy matches the requested filters")
 
         ordered = self._nolock_ordered_candidates(subset, active)
-        limit = self.config.max_connections_per_proxy
+        limit = self.config.limits.max_connections_per_proxy
         saturated = False
         nc = len(ordered)
 
@@ -308,7 +308,7 @@ class _PoolState:
                     saturated = True
                     continue
 
-            if self.config.max_rps_per_proxy is not None and not self._nolock_consume_token(k):
+            if self.config.limits.max_rps_per_proxy is not None and not self._nolock_consume_token(k):
                 saturated = True
                 continue
 
@@ -424,7 +424,7 @@ class HealthMonitor:
                             if isinstance(item, BaseException):
                                 continue
                             p, result = item
-                            if cb := pool.config.on_check_complete:
+                            if cb := pool.config.hooks.on_check_complete:
                                 cb(p, result)
                         for item in results:
                             if isinstance(item, BaseException):
@@ -572,7 +572,7 @@ class BaseProxyPool(ABC):
                     self._active_connections[k] = n - 1
                 self._notify_sync_condition(notify_all=False)
         self._notify_async_condition(notify_all=False)
-        if cb := self.config.on_proxy_released:
+        if cb := self.config.hooks.on_proxy_released:
             cb(proxy)
 
     def _merge_refreshed_proxies(self, raw: list[Proxy | str]) -> None:
@@ -727,19 +727,19 @@ class SyncProxyPool(BaseProxyPool):
         try:
             proxy = self._select_candidate(**kwargs)
         except PoolExhausted:
-            if self.config.on_exhausted is not None:
-                self.config.on_exhausted()
+            if self.config.hooks.on_exhausted is not None:
+                self.config.hooks.on_exhausted()
             if self.config.refresh_callback is not None:
                 self._run_refresh_sync()
                 proxy = self._select_candidate(**kwargs)
             else:
                 raise
         except PoolSaturated:
-            if self.config.on_saturated is not None:
-                self.config.on_saturated()
+            if self.config.hooks.on_saturated is not None:
+                self.config.hooks.on_saturated()
             raise
-        if self.config.on_proxy_acquired:
-            self.config.on_proxy_acquired(proxy)
+        if self.config.hooks.on_proxy_acquired:
+            self.config.hooks.on_proxy_acquired(proxy)
         return proxy
 
     def __enter__(self) -> Proxy:
@@ -768,9 +768,9 @@ class SyncProxyPool(BaseProxyPool):
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             cooled, p = self._state._nolock_mark_failed(p, exc_type)
             self._notify_sync_condition(notify_all=cooled)
-        if cb := self.config.on_proxy_failed:
+        if cb := self.config.hooks.on_proxy_failed:
             cb(p, exc_type)
-        if cooled and (cb_cd := self.config.on_proxy_cooled_down):
+        if cooled and (cb_cd := self.config.hooks.on_proxy_cooled_down):
             cb_cd(p)
 
     def mark_success(self, proxy: Proxy | str) -> None:
@@ -780,7 +780,7 @@ class SyncProxyPool(BaseProxyPool):
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             prev_failures = self._state._nolock_mark_success(p)
             self._notify_sync_condition(notify_all=False)
-        if prev_failures > 0 and (cb := self.config.on_proxy_recovered):
+        if prev_failures > 0 and (cb := self.config.hooks.on_proxy_recovered):
             cb(p)
 
     def reset_pool(self) -> None:
@@ -1111,19 +1111,19 @@ class AsyncProxyPool(BaseProxyPool):
         try:
             proxy = await self._aselect_candidate(**kwargs)
         except PoolExhausted:
-            if self.config.on_exhausted is not None:
-                self.config.on_exhausted()
+            if self.config.hooks.on_exhausted is not None:
+                self.config.hooks.on_exhausted()
             if self.config.arefresh_callback is not None:
                 await self._run_arefresh_async()
                 proxy = await self._aselect_candidate(**kwargs)
             else:
                 raise
         except PoolSaturated:
-            if self.config.on_saturated is not None:
-                self.config.on_saturated()
+            if self.config.hooks.on_saturated is not None:
+                self.config.hooks.on_saturated()
             raise
-        if self.config.on_proxy_acquired:
-            self.config.on_proxy_acquired(proxy)
+        if self.config.hooks.on_proxy_acquired:
+            self.config.hooks.on_proxy_acquired(proxy)
         return proxy
 
     async def __aenter__(self) -> Proxy:
@@ -1157,9 +1157,9 @@ class AsyncProxyPool(BaseProxyPool):
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             cooled, p = self._state._nolock_mark_failed(p, exc_type)
         self._notify_async_condition(notify_all=cooled)
-        if cb := self.config.on_proxy_failed:
+        if cb := self.config.hooks.on_proxy_failed:
             cb(p, exc_type)
-        if cooled and (cb_cd := self.config.on_proxy_cooled_down):
+        if cooled and (cb_cd := self.config.hooks.on_proxy_cooled_down):
             cb_cd(p)
 
     def mark_success(self, proxy: Proxy | str) -> None:
@@ -1169,7 +1169,7 @@ class AsyncProxyPool(BaseProxyPool):
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             prev_failures = self._state._nolock_mark_success(p)
         self._notify_async_condition(notify_all=False)
-        if prev_failures > 0 and (cb := self.config.on_proxy_recovered):
+        if prev_failures > 0 and (cb := self.config.hooks.on_proxy_recovered):
             cb(p)
 
     def reset_pool(self) -> None:
@@ -1259,6 +1259,8 @@ __all__ = [
     "BasePoolProtocol",
     "BaseProxyPool",
     "HealthMonitor",
+    "LifecycleHooks",
+    "LimitsConfig",
     "MonitorablePoolProtocol",
     "PoolConfig",
     "ProxyPool",

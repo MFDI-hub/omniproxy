@@ -19,7 +19,7 @@ from collections import deque
 from typing import Any
 
 import pytest
-from omniproxy.config import HealthCheckConfig, PoolConfig
+from omniproxy.config import HealthCheckConfig, LifecycleHooks, LimitsConfig, PoolConfig
 from omniproxy.errors import (
     MissingProxyMetadata,
     NoMatchingProxy,
@@ -158,7 +158,10 @@ class TestBaseShared:
         recovered: list[Proxy] = []
         pool = SyncProxyPool(
             [S0],
-            PoolConfig(failure_threshold=5, on_proxy_recovered=lambda p: recovered.append(p)),
+            PoolConfig(
+                failure_threshold=5,
+                hooks=LifecycleHooks(on_proxy_recovered=lambda p: recovered.append(p)),
+            ),
         )
         pool.mark_success(S0)
         assert recovered == []
@@ -171,10 +174,12 @@ class TestBaseShared:
         p1 = Proxy(S0)
         cfg = PoolConfig(
             failure_threshold=1,
-            on_proxy_failed=lambda p, et: log.append("failed"),
-            on_proxy_cooled_down=lambda p: log.append("cooled"),
-            on_proxy_acquired=lambda p: log.append("acq"),
-            on_proxy_released=lambda p: log.append("rel"),
+            hooks=LifecycleHooks(
+                on_proxy_failed=lambda p, et: log.append("failed"),
+                on_proxy_cooled_down=lambda p: log.append("cooled"),
+                on_proxy_acquired=lambda p: log.append("acq"),
+                on_proxy_released=lambda p: log.append("rel"),
+            ),
         )
         pool = SyncProxyPool([p1], cfg)
         with pool:
@@ -413,7 +418,9 @@ class TestAsyncPool:
                 out.append(p.url)
 
         async def main() -> None:
-            pool = AsyncProxyPool([S0, S1], PoolConfig(max_connections_per_proxy=2))
+            pool = AsyncProxyPool(
+                [S0, S1], PoolConfig(limits=LimitsConfig(max_connections_per_proxy=2))
+            )
             urls: list[str] = []
             await asyncio.gather(worker(pool, urls), worker(pool, urls))
             assert len(set(urls)) == 2
@@ -467,7 +474,7 @@ class TestRotation:
 
 class TestMaxConnections:
     def test_saturated_all_at_limit(self) -> None:
-        cfg = PoolConfig(max_connections_per_proxy=1, acquire_timeout=0.0)
+        cfg = PoolConfig(limits=LimitsConfig(max_connections_per_proxy=1), acquire_timeout=0.0)
         pool = SyncProxyPool([S0], cfg)
         hold = threading.Event()
         release = threading.Event()
@@ -489,10 +496,12 @@ class TestMaxConnections:
 
     def test_on_saturated_callback(self) -> None:
         cfg = PoolConfig(
-            max_connections_per_proxy=1, acquire_timeout=0.0, on_saturated=lambda: None
+            limits=LimitsConfig(max_connections_per_proxy=1),
+            acquire_timeout=0.0,
+            hooks=LifecycleHooks(on_saturated=lambda: None),
         )
         pool = SyncProxyPool([S0], cfg)
-        with mock.patch.object(cfg, "on_saturated", wraps=cfg.on_saturated) as w:
+        with mock.patch.object(cfg.hooks, "on_saturated", wraps=cfg.hooks.on_saturated) as w:
             hold = threading.Event()
             release = threading.Event()
 
@@ -513,7 +522,7 @@ class TestMaxConnections:
             w.assert_called()
 
     def test_release_decrements(self) -> None:
-        cfg = PoolConfig(max_connections_per_proxy=2)
+        cfg = PoolConfig(limits=LimitsConfig(max_connections_per_proxy=2))
         pool = SyncProxyPool([S0], cfg)
         with pool:
             k = pool._key(Proxy(S0))
@@ -530,13 +539,17 @@ class TestMaxConnections:
 
 class TestRps:
     def test_second_immediate_get_saturates(self) -> None:
-        pool = SyncProxyPool([S0], PoolConfig(max_rps_per_proxy=1.0, acquire_timeout=0.0))
+        pool = SyncProxyPool(
+            [S0], PoolConfig(limits=LimitsConfig(max_rps_per_proxy=1.0), acquire_timeout=0.0)
+        )
         pool.get_next()
         with pytest.raises(PoolSaturated):
             pool.get_next()
 
     def test_bucket_refills(self) -> None:
-        pool = SyncProxyPool([S0], PoolConfig(max_rps_per_proxy=1.0, acquire_timeout=0.0))
+        pool = SyncProxyPool(
+            [S0], PoolConfig(limits=LimitsConfig(max_rps_per_proxy=1.0), acquire_timeout=0.0)
+        )
         t0 = 10_000_000.0
         with mock.patch("time.monotonic", return_value=t0):
             pool.get_next()
@@ -545,7 +558,7 @@ class TestRps:
         assert p.port == Proxy(S0).port
 
     def test_bucket_lazy_init(self) -> None:
-        pool = SyncProxyPool([S0], PoolConfig(max_rps_per_proxy=2.0))
+        pool = SyncProxyPool([S0], PoolConfig(limits=LimitsConfig(max_rps_per_proxy=2.0)))
         with pool._lock:
             assert pool._state._token_buckets is None
         pool.get_next()
@@ -669,7 +682,9 @@ class TestShimProtocolsHealth:
                     health_check=HealthCheckConfig(
                         recovery_interval=0.05, url="http://127.0.0.1:9"
                     ),
-                    on_check_complete=lambda p, r: completes.append((p.url, r.success)),
+                    hooks=LifecycleHooks(
+                        on_check_complete=lambda p, r: completes.append((p.url, r.success))
+                    ),
                 ),
             )
             with mock.patch("omniproxy.pool.arun_health_check", side_effect=fake_arun):
