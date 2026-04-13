@@ -74,11 +74,13 @@ dev = [
     "pytest>=8.0",
     "mypy>=1.8",
     "ruff>=0.4",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.3",
 ]
 
 [project.urls]
 Homepage = "https://github.com/mfdi/omniproxy"
-Documentation = "https://github.io/mfdi/omniproxy"
+Documentation = "https://mfdi.github.io/omniproxy/"
 Repository = "https://github.com/mfdi/omniproxy"
 Issues = "https://github.com/mfdi/omniproxy/issues"
 

@@ -1,0 +1,97 @@
+site_name: omniproxy
+site_description: >-
+  Use a proxy as a string, but achieve broad functionality for parsing, checking,
+  pooling, and automation.
+site_url: https://mfdi.github.io/omniproxy/
+repo_url: https://github.com/mfdi/omniproxy
+repo_name: mfdi/omniproxy
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.code.copy
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            members_order: source
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            separate_signature: true
+            line_length: 88
+            merge_init_into_class: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Reference:
+      - Overview: reference/overview.md
+      - Proxy: reference/proxy.md
+      - Parser: reference/parser.md
+      - Backends: reference/backends.md
+      - Checking: reference/checking.md
+      - File and network I/O: reference/io.md
+      - Pools: reference/pools.md
+      - Configuration: reference/configuration.md
+      - Package layout and exports: reference/exports.md
+  - CLI: cli.md
+  - API Reference: api.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mfdi/omniproxy
