@@ -114,3 +114,4 @@
 
 *This file is a living map from user-facing behavior to modules (`proxy.py`, `utils.py`, `extended_proxy.py`, `backends/*`, `io.py`, `pool.py`, `config.py`, `errors.py`, `constants.py`, `cli.py`). Update when public API or defaults change.*
 
+
