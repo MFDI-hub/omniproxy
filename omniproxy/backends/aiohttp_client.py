@@ -6,8 +6,8 @@ import asyncio
 import contextlib
 from typing import Any
 
-from aiohttp import ClientTimeout, TCPConnector  # type: ignore
-from aiohttp.client import ClientSession  # type: ignore
+from aiohttp import ClientTimeout, TCPConnector
+from aiohttp.client import ClientSession
 
 from ..constants import DEFAULT_BACKEND_TIMEOUT
 from ..proxy import Proxy
@@ -79,7 +79,7 @@ class AiohttpBackend(BaseBackend):
             'aget'
         """
         try:
-            from aiohttp_socks import ProxyConnector  # type: ignore
+            from aiohttp_socks import ProxyConnector
         except ImportError as e:
             raise ImportError(
                 "Install with 'uv add omniproxy --extra aiohttp' (needs aiohttp-socks for SOCKS)."

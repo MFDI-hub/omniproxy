@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .backends.factory import get_backend
 from .config import settings
@@ -18,7 +18,7 @@ from .constants import (
     DEFAULT_RETRYABLE_HTTP_STATUSES,
     URL_HEADERS_PROBE,
 )
-from .proxy import SimpleProxy
+from .proxy import Proxy as BaseProxy
 
 if TYPE_CHECKING:
     from .client import AsyncClient, Client
@@ -41,26 +41,26 @@ def _check_exceptions() -> tuple[type[BaseException], ...]:
     ]
 
     try:
-        from python_socks._errors import ProxyConnectionError, ProxyTimeoutError  # type: ignore
+        from python_socks._errors import ProxyConnectionError, ProxyTimeoutError
 
         out.extend([ProxyConnectionError, ProxyTimeoutError])
     except ImportError:
         pass
 
     try:
-        import httpx  # type: ignore
+        import httpx
 
         out.append(httpx.HTTPError)
     except ImportError:
         pass
     try:
-        import requests  # type: ignore
+        import requests
 
         out.append(requests.RequestException)
     except ImportError:
         pass
     try:
-        import aiohttp  # type: ignore
+        import aiohttp
 
         out.append(aiohttp.ClientError)
     except ImportError:
@@ -185,7 +185,7 @@ class CheckResult:
 
 
 def apply_check_result_metadata(
-    proxy: SimpleProxy,
+    proxy: Proxy,
     *,
     latency: float | None,
     anonymity: str | None,
@@ -198,7 +198,7 @@ def apply_check_result_metadata(
     """Write check metadata fields onto a :class:`Proxy` instance.
 
     Args:
-        proxy (SimpleProxy): Target proxy (must support :meth:`~omniproxy.proxy.Proxy._set_attribute`).
+        proxy (Proxy): Target proxy (must support :meth:`~omniproxy.proxy.Proxy._set_attribute`).
         latency (float | None): Observed latency.
         anonymity (str | None): Classified anonymity label, if known.
         status (bool): ``last_status`` flag for this check.
@@ -232,7 +232,7 @@ def apply_check_result_metadata(
         proxy._set_attribute("org", org)
 
 
-class Proxy(SimpleProxy):
+class Proxy(BaseProxy):
     """Public subclass of :class:`~omniproxy.proxy.Proxy` used throughout omniproxy I/O and pooling.
 
     Adds convenience wrappers around :func:`check_proxy`, :func:`acheck_proxy`, and JSON **info**
@@ -261,7 +261,7 @@ class Proxy(SimpleProxy):
             >>> Proxy("127.0.0.1:1").get_info  # doctest: +ELLIPSIS
             <bound method Proxy.get_info of ...>
         """
-        return check_proxy(self, with_info=True, fields=fields, **kwargs)[1]  # type: ignore[return-value]
+        return cast(dict[str, str], check_proxy(self, with_info=True, fields=fields, **kwargs)[1])
 
     async def aget_info(self, fields: str = DEFAULT_CHECK_FIELDS, **kwargs: Any) -> dict[str, str]:
         """Async variant of :meth:`get_info`.
@@ -277,7 +277,7 @@ class Proxy(SimpleProxy):
             >>> Proxy("127.0.0.1:1").aget_info  # doctest: +ELLIPSIS
             <bound method Proxy.aget_info of ...>
         """
-        return (await acheck_proxy(self, with_info=True, fields=fields, **kwargs))[1]  # type: ignore[return-value]
+        return cast(dict[str, str], (await acheck_proxy(self, with_info=True, fields=fields, **kwargs))[1])
 
     def check(
         self, url: str | None = None, raise_on_error: bool = False, **kwargs: Any
@@ -296,7 +296,7 @@ class Proxy(SimpleProxy):
             >>> Proxy("127.0.0.1:1").check  # doctest: +ELLIPSIS
             <bound method Proxy.check of ...>
         """
-        return check_proxy(self, url=url, raise_on_error=raise_on_error, **kwargs)[1]  # type: ignore[return-value]
+        return cast(CheckResult, check_proxy(self, url=url, raise_on_error=raise_on_error, **kwargs)[1])
 
     async def acheck(
         self, url: str | None = None, raise_on_error: bool = False, **kwargs: Any
@@ -315,7 +315,10 @@ class Proxy(SimpleProxy):
             >>> Proxy("127.0.0.1:1").acheck  # doctest: +ELLIPSIS
             <bound method Proxy.acheck of ...>
         """
-        return (await acheck_proxy(self, url=url, raise_on_error=raise_on_error, **kwargs))[1]  # type: ignore[return-value]
+        return cast(
+            CheckResult,
+            (await acheck_proxy(self, url=url, raise_on_error=raise_on_error, **kwargs))[1],
+        )
 
     def get_client(self) -> Client:
         """Build a synchronous :class:`~omniproxy.backends.httpx_client.Client` using this proxy.
@@ -517,7 +520,7 @@ async def acheck_proxy(
 
 
 async def acheck_proxies(
-    proxy_list: list[Proxy | str],
+    proxy_list: Sequence[Proxy | str],
     url: str | None = None,
     with_info: bool = False,
     fields: str = DEFAULT_CHECK_FIELDS,
@@ -530,7 +533,7 @@ async def acheck_proxies(
     """Check many proxies concurrently via :func:`acheck_proxy`.
 
     Args:
-        proxy_list (list[Proxy | str]): Proxies to test in parallel.
+        proxy_list (Sequence[Proxy | str]): Proxies to test in parallel.
         url (str | None): Shared explicit URL or default rotation.
         with_info (bool): Whether to collect JSON info tuples vs boolean results.
         fields (str): Info-template ``fields`` parameter.
@@ -565,13 +568,15 @@ async def acheck_proxies(
     results = await asyncio.gather(*tasks)
 
     if with_info:
-        success = [(px, info) for px, info in results if info is not False]
-        failed = [(px, info) for px, info in results if info is False]
-    else:
-        success = [px for px, status in results if status]
-        failed = [px for px, status in results if not status]
-
-    return success, failed
+        success_info = [(px, info) for px, info in results if info is not False]
+        failed_info = [(px, info) for px, info in results if info is False]
+        return cast(
+            tuple[list[Proxy], list[Proxy]] | tuple[list[tuple[Proxy, dict]], list[tuple[Proxy, bool]]],
+            (success_info, failed_info),
+        )
+    success_plain = [px for px, status in results if status]
+    failed_plain = [px for px, status in results if not status]
+    return success_plain, failed_plain
 
 
 def check_proxy(
@@ -726,7 +731,7 @@ def check_proxy(
 
 
 def check_proxies(
-    proxy_list: list[Proxy | str],
+    proxy_list: Sequence[Proxy | str],
     url: str | None = None,
     with_info: bool = False,
     fields: str = DEFAULT_CHECK_FIELDS,
@@ -742,7 +747,7 @@ def check_proxies(
     """Check a list of proxies using asyncio or a thread pool.
 
     Args:
-        proxy_list (list[Proxy | str]): Inputs to check.
+        proxy_list (Sequence[Proxy | str]): Inputs to check.
         url (str | None): Shared URL override.
         with_info (bool): Collect per-proxy JSON when ``True``.
         fields (str): Info URL fields template value.
@@ -844,7 +849,7 @@ def run_health_check(
         headers=hc.headers or None,
     )
 
-    return p, result  # type: ignore[return-value]
+    return cast(tuple[Proxy, CheckResult], (p, result))
 
 
 async def arun_health_check(
@@ -880,7 +885,7 @@ async def arun_health_check(
         headers=hc.headers or None,
     )
 
-    return p, result  # type: ignore[return-value]
+    return cast(tuple[Proxy, CheckResult], (p, result))
 
 
 __all__ = [

@@ -90,7 +90,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"ok={len(good)} fail={len(bad)}")
         if args.output_good:
-            save_proxies(args.output_good, good)
+            save_proxies(
+                args.output_good,
+                [px if not isinstance(px, tuple) else px[0] for px in good],
+            )
         return 0
 
     if args.cmd == "scrape":

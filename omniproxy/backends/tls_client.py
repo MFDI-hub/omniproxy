@@ -48,7 +48,7 @@ class TlsClientBackend(BaseBackend):
             'get'
         """
         try:
-            import tls_client  # type: ignore
+            import tls_client
         except ImportError as e:
             raise ImportError("Install with 'uv add omniproxy --extra tls_client'") from e
 

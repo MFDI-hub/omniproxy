@@ -30,9 +30,7 @@ OMNIPROXY_CONFIG_PUBLIC_KEYS: frozenset[str] = frozenset(
 DEFAULT_BACKEND: str = "httpx"
 DEFAULT_TIMEOUT: float = 10.0
 DEFAULT_CHECK_URLS: tuple[str, ...] = ("https://api.ipify.org/?format=json",)
-DEFAULT_CHECK_INFO_URL_TEMPLATES: tuple[str, ...] = (
-    "http://ip-api.com/json/?fields={fields}",
-)
+DEFAULT_CHECK_INFO_URL_TEMPLATES: tuple[str, ...] = ("http://ip-api.com/json/?fields={fields}",)
 DEFAULT_HEALTH_CHECK_URLS: tuple[str, ...] = ()
 
 # --- Proxy check / anonymity probe ---
@@ -143,8 +141,8 @@ __all__ = [
     "DEFAULT_CHECK_MAX_RETRIES",
     "DEFAULT_CHECK_RETRY_BACKOFF",
     "DEFAULT_CHECK_URLS",
-    "DEFAULT_HEALTH_CHECK_URLS",
     "DEFAULT_FETCH_USER_AGENT",
+    "DEFAULT_HEALTH_CHECK_URLS",
     "DEFAULT_PROXY_PATTERN_STRING",
     "DEFAULT_RETRYABLE_HTTP_STATUSES",
     "DEFAULT_TIMEOUT",

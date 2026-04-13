@@ -163,7 +163,11 @@ def _iter_proxies_from_text_stream(
     Example:
         >>> from io import StringIO
         >>> from omniproxy.io import _iter_proxies_from_text_stream
-        >>> next(_iter_proxies_from_text_stream(StringIO("127.0.0.1:3" + chr(10)), on_invalid="raise", errors_out=None)).port
+        >>> next(
+        ...     _iter_proxies_from_text_stream(
+        ...         StringIO("127.0.0.1:3" + chr(10)), on_invalid="raise", errors_out=None
+        ...     )
+        ... ).port
         3
     """
     from .extended_proxy import Proxy

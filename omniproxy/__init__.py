@@ -18,7 +18,7 @@ from .extended_proxy import (
 )
 from .io import fetch_proxies, iter_proxies_from_file, read_proxies, save_proxies
 from .pool import ProxyPool
-from .proxy import PlaywrightProxySettings, ProxyPattern, SimpleProxy
+from .proxy import PlaywrightProxySettings, ProxyPattern
 
 __all__ = [
     "AsyncClient",
@@ -33,7 +33,6 @@ __all__ = [
     "Proxy",
     "ProxyPattern",
     "ProxyPool",
-    "SimpleProxy",
     "acheck_proxies",
     "acheck_proxy",
     "apply_check_result_metadata",
@@ -75,4 +74,4 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__version__: str = "4.0.0"
+__version__ = "4.0.0"

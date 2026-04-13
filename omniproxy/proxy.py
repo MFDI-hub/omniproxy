@@ -89,7 +89,7 @@ class ProxyPattern(str):
         return str.__new__(cls, pattern)
 
 
-class SimpleProxy(str):
+class Proxy(str):
     """Immutable subclass of :class:`str` representing one proxy endpoint.
 
     The value of the string is the canonical URL produced from parsed structural fields using
@@ -161,13 +161,30 @@ class SimpleProxy(str):
         "username",
     )
 
+    # Explicit annotations are required for mypy to recognise __slots__ as instance attributes.
+    # Without them mypy reports '"Proxy" has no attribute "X"' for every slot access.
+    protocol: str
+    ip: str
+    port: int
+    username: str | None
+    password: str | None
+    rotation_url: str | None
+    latency: float | None
+    anonymity: str | None
+    last_checked: float | None
+    last_status: bool | None
+    country: str | None
+    city: str | None
+    asn: str | None
+    org: str | None
+
     default_pattern = ProxyPattern(DEFAULT_PROXY_PATTERN_STRING)
     _structural_attributes = PROXY_STRUCTURAL_FIELDS
     _metadata_attributes = PROXY_METADATA_FIELDS
     # Frozen at class body: structural + metadata names guarded by __setattr__
     _protected_attributes: frozenset[str] = frozenset(_structural_attributes + _metadata_attributes)
 
-    def __new__(cls, proxy: str | SimpleProxy, /, protocol: str | None = None) -> SimpleProxy:
+    def __new__(cls, proxy: str | Proxy, /, protocol: str | None = None) -> Proxy:
         """Create a :class:`Proxy` from a string or existing instance, optionally changing protocol.
 
         Args:
@@ -185,7 +202,7 @@ class SimpleProxy(str):
             'socks5'
         """
         # 1. FAST PATH
-        if isinstance(proxy, SimpleProxy):
+        if isinstance(proxy, Proxy):
             if protocol is None or protocol.lower() == (proxy.protocol or "").lower():
                 return proxy
 
@@ -352,6 +369,19 @@ class SimpleProxy(str):
             return self.last_status
         # Fall back to latency if no check has been recorded yet
         return self.latency is not None and self.latency > 0
+
+    def _ordering_key(self) -> tuple[float, float, str]:
+        """Stable sort key: lower latency first, then fresher ``last_checked``, then :attr:`url`.
+
+        Missing latency sorts after any measured value. Missing ``last_checked`` sorts after
+        entries with the same latency that have a timestamp (newer timestamps win ties).
+        """
+        lat = self.latency
+        lat_key = float("inf") if lat is None else float(lat)
+        ts = self.last_checked
+        # Negate so ascending tuple order prefers larger (more recent) timestamps
+        ts_key = float("inf") if ts is None else -float(ts)
+        return (lat_key, ts_key, self.url)
 
     def as_requests_proxies(self) -> dict[str, str]:
         """Build a ``proxies`` dict for ``requests`` / ``urllib`` style APIs.
@@ -543,7 +573,7 @@ class SimpleProxy(str):
         cls.default_pattern = ProxyPattern(pattern)
 
     @classmethod
-    def validate(cls, v: str) -> SimpleProxy:
+    def validate(cls, v: str) -> Proxy:
         """Parse *v* or raise ``ValueError`` with the original error chained.
 
         Args:
@@ -601,11 +631,43 @@ class SimpleProxy(str):
             >>> Proxy("127.0.0.1:1") == "http://127.0.0.1:1"
             True
         """
-        if isinstance(other, SimpleProxy):
+        if isinstance(other, Proxy):
             return self.url == other.url
         if isinstance(other, str):
             return self.url == other
         return NotImplemented
+
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, Proxy):
+            return NotImplemented
+        return self._ordering_key() <= other._ordering_key()
+
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, Proxy):
+            return NotImplemented
+        return self._ordering_key() >= other._ordering_key()
+
+    def __lt__(self, other: object) -> bool:
+        """Compare for ``sorted()`` / ``<``: lower latency first, then newer ``last_checked``.
+
+        Args:
+            other (object): Another :class:`Proxy` or subclass.
+
+        Returns:
+            bool: Ordering per :meth:`_ordering_key`.
+
+        Raises:
+            TypeError: Implicitly if *other* is not a :class:`Proxy`; returns ``NotImplemented``.
+        """
+        if not isinstance(other, Proxy):
+            return NotImplemented
+        return self._ordering_key() < other._ordering_key()
+
+    def __gt__(self, other: object) -> bool:
+        """Inverse of :meth:`__lt__` for ``>`` comparisons."""
+        if not isinstance(other, Proxy):
+            return NotImplemented
+        return self._ordering_key() > other._ordering_key()
 
     def __setattr__(self, key: str, value: Any) -> None:
         """Block writes to structural and metadata slot names after construction.
@@ -636,7 +698,7 @@ class SimpleProxy(str):
             )
         return super().__setattr__(key, value)
 
-    def __reduce__(self) -> tuple[type[SimpleProxy], tuple[str], dict[str, Any]]:
+    def __reduce__(self) -> tuple[type[Proxy], tuple[str], dict[str, Any]]:
         """Pickle support: reconstruct from URL plus metadata state dict.
 
         Returns:
@@ -667,5 +729,17 @@ class SimpleProxy(str):
         for key, value in state.items():
             object.__setattr__(self, key, value)
 
+    def __getstate__(self) -> dict[str, Any]:
+        return {k: getattr(self, k) for k in self._metadata_attributes}
 
-__all__ = ["PlaywrightProxySettings", "ProxyPattern", "SimpleProxy"]
+    def __bool__(self) -> bool:
+        return self.is_working
+
+    def __copy__(self) -> Proxy:
+        return self
+
+    def __deepcopy__(self, memo: dict) -> Proxy:
+        return self
+
+
+__all__ = ["PlaywrightProxySettings", "Proxy", "ProxyPattern"]

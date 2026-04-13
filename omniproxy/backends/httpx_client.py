@@ -5,8 +5,8 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
-import httpx  # type: ignore
-from httpx_socks import AsyncProxyTransport, SyncProxyTransport  # type: ignore
+import httpx
+from httpx_socks import AsyncProxyTransport, SyncProxyTransport
 
 from ..constants import DEFAULT_BACKEND_TIMEOUT
 from ..proxy import Proxy

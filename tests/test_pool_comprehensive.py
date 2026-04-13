@@ -737,11 +737,13 @@ class TestShimProtocolsHealth:
                     failure_threshold=99,
                 ),
             )
-            with mock.patch("omniproxy.pool.arun_health_check", side_effect=fake_arun):
-                with mock.patch.object(AsyncProxyPool, "mark_failed", track):
-                    pool.start_monitoring()
-                    await asyncio.sleep(0.12)
-                    pool.stop_monitoring()
+            with (
+                mock.patch("omniproxy.pool.arun_health_check", side_effect=fake_arun),
+                mock.patch.object(AsyncProxyPool, "mark_failed", track),
+            ):
+                pool.start_monitoring()
+                await asyncio.sleep(0.12)
+                pool.stop_monitoring()
             assert calls
             await pool.aclose()
 

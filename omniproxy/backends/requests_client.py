@@ -43,7 +43,7 @@ class RequestsBackend(BaseBackend):
             >>> RequestsBackend.get.__name__
             'get'
         """
-        import requests  # type: ignore
+        import requests
 
         proxies = proxy.as_requests_proxies()
         r = requests.get(url, proxies=proxies, timeout=timeout, **kwargs)
@@ -95,7 +95,7 @@ class RequestsBackend(BaseBackend):
             >>> RequestsBackend.request_direct.__name__
             'request_direct'
         """
-        import requests  # type: ignore
+        import requests
 
         r = requests.request(method.upper(), url, timeout=timeout, **kwargs)
         jd = None

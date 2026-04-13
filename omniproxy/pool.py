@@ -308,7 +308,9 @@ class _PoolState:
                     saturated = True
                     continue
 
-            if self.config.limits.max_rps_per_proxy is not None and not self._nolock_consume_token(k):
+            if self.config.limits.max_rps_per_proxy is not None and not self._nolock_consume_token(
+                k
+            ):
                 saturated = True
                 continue
 
@@ -342,7 +344,9 @@ class _PoolState:
         self._failure_counts[k] = count
         cooled = count >= self.config.failure_threshold
         if cooled:
-            penalty = self.config.failure_penalties.get(exc_type, 1.0)
+            penalty = (
+                self.config.failure_penalties.get(exc_type, 1.0) if exc_type is not None else 1.0
+            )
             self._cooldown_until[k] = time.monotonic() + (self.config.cooldown * penalty)
             if isinstance(self.proxies, list):
                 self.proxies[:] = [x for x in self.proxies if self._nolock_key(x) != k]
@@ -961,7 +965,7 @@ class AsyncProxyPool(BaseProxyPool):
             if not t.done():
                 t.cancel()
 
-    def _notify_async_condition(self, *, notify_all: bool) -> None:
+    def _notify_async_condition(self, *, notify_all: bool = False) -> None:
         loop = self._async_consumer_loop
         if loop is None or not loop.is_running():
             return

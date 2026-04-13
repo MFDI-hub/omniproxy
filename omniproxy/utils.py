@@ -215,16 +215,32 @@ class OmniproxyParser(msgspec.Struct):
             ValueError: If protocol is unsupported or required groups are missing.
 
         Example:
-            >>> OmniproxyParser.from_match({"protocol": "http", "ip": "9.9.9.9", "port": "53", "username": None, "password": None, "url": None}).port
+            >>> OmniproxyParser.from_match(
+            ...     {
+            ...         "protocol": "http",
+            ...         "ip": "9.9.9.9",
+            ...         "port": "53",
+            ...         "username": None,
+            ...         "password": None,
+            ...         "url": None,
+            ...     }
+            ... ).port
             53
         """
         raw_proto = (groups.get("protocol") or "http").lower()
         if raw_proto not in ("http", "https", "socks5", "socks4"):
             raise ValueError(f"Unsupported protocol: {raw_proto!r}")
+        # The regex patterns guarantee "ip" and "port" are captured whenever any
+        # pattern matches, so these values are never None at this point.
+        _ip = groups["ip"]
+        _port = groups["port"]
+        assert _ip is not None and _port is not None, (
+            "regex match must capture 'ip' and 'port' groups"
+        )
         return cls(
             protocol=raw_proto,  # type: ignore[arg-type]
-            ip=groups["ip"],
-            port=int(groups["port"]),
+            ip=_ip,
+            port=int(_port),
             username=groups.get("username"),
             password=groups.get("password"),
             rotation_url=groups.get("url"),

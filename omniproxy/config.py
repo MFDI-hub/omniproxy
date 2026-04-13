@@ -464,19 +464,19 @@ class OmniproxyConfig:
                 self._data["default_connect_timeout"] = self._validate_positive_timeout(value)
             return None
         if name == "default_check_urls":
-            v = self._validate_url_string_list(value, "default_check_urls")
+            url_list = self._validate_url_string_list(value, "default_check_urls")
             with self._lock:
-                self._data["default_check_urls"] = v
+                self._data["default_check_urls"] = url_list
             return None
         if name == "default_check_info_url_templates":
-            v = self._validate_url_string_list(value, "default_check_info_url_templates")
+            url_list = self._validate_url_string_list(value, "default_check_info_url_templates")
             with self._lock:
-                self._data["default_check_info_url_templates"] = v
+                self._data["default_check_info_url_templates"] = url_list
             return None
         if name == "health_check_urls":
-            v = self._validate_optional_url_string_list(value, "health_check_urls")
+            opt_url_list = self._validate_optional_url_string_list(value, "health_check_urls")
             with self._lock:
-                self._data["health_check_urls"] = v
+                self._data["health_check_urls"] = opt_url_list
             return None
         raise AttributeError(f"Unknown config attribute {name!r}")
 
