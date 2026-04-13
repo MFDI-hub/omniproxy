@@ -1,8 +1,14 @@
+"""``acheck_proxy`` status handling; backend is mocked (no live traffic to ``PROXIES``)."""
+
 import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from omniproxy import Proxy, acheck_proxy
+
+from tests.proxy_seeds import seeds
+
+S0 = seeds(1)[0]
 
 
 class TestAcheckStatus(unittest.TestCase):
@@ -15,7 +21,7 @@ class TestAcheckStatus(unittest.TestCase):
 
         async def run() -> tuple[Proxy, object]:
             with patch("omniproxy.extended_proxy.get_backend", return_value=backend):
-                return await acheck_proxy("10.0.0.1:8000", max_retries=0)
+                return await acheck_proxy(S0, max_retries=0)
 
         proxy, ok = asyncio.run(run())
         self.assertIsInstance(proxy, Proxy)

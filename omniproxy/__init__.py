@@ -1,6 +1,12 @@
 from .backends import get_backend, supported_backends
 from .config import settings
-from .errors import MissingProxyMetadata, NoMatchingProxy, PoolExhausted, PoolSaturated
+from .errors import (
+    MissingProxyMetadata,
+    NoMatchingProxy,
+    PoolClosedError,
+    PoolExhausted,
+    PoolSaturated,
+)
 from .extended_proxy import (
     CheckResult,
     Proxy,
@@ -12,7 +18,7 @@ from .extended_proxy import (
 )
 from .io import fetch_proxies, iter_proxies_from_file, read_proxies, save_proxies
 from .pool import ProxyPool
-from .proxy import PlaywrightProxySettings, ProxyPattern
+from .proxy import PlaywrightProxySettings, ProxyPattern, SimpleProxy
 
 __all__ = [
     "AsyncClient",
@@ -21,11 +27,13 @@ __all__ = [
     "MissingProxyMetadata",
     "NoMatchingProxy",
     "PlaywrightProxySettings",
+    "PoolClosedError",
     "PoolExhausted",
     "PoolSaturated",
     "Proxy",
     "ProxyPattern",
     "ProxyPool",
+    "SimpleProxy",
     "acheck_proxies",
     "acheck_proxy",
     "apply_check_result_metadata",
@@ -67,4 +75,4 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__version__ = "4.0.0"
+__version__: str = "4.0.0"

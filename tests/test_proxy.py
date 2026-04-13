@@ -3,11 +3,22 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from omniproxy import PlaywrightProxySettings, Proxy
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class Account(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     proxy: Proxy
+
+    @field_validator("proxy", mode="before")
+    @classmethod
+    def _coerce_proxy(cls, v: object) -> Proxy:
+        if isinstance(v, Proxy):
+            return v
+        if isinstance(v, str):
+            return Proxy(v)
+        raise TypeError(f"proxy must be str or Proxy, got {type(v).__name__}")
 
 
 class TestProxy(unittest.TestCase):

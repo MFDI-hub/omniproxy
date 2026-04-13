@@ -180,3 +180,5 @@ cache/
 rust/
 scripts/
 testingoutsmth.py
+*.txt
+*.json
