@@ -4,10 +4,9 @@ import ipaddress
 import re
 from typing import Any, Literal, TypedDict, cast
 
-from typing_extensions import Self
-
 import msgspec
 import orjson
+from typing_extensions import Self
 
 # from .adapter import _ExtraTypeConstructor
 from .constants import (
