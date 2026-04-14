@@ -204,13 +204,13 @@
     
     
       <div class="md-header__source">
-        <a href="https://github.com/mfdi/omniproxy" title="Go to repository" class="md-source" data-md-component="source">
+        <a href="https://github.com/MFDI-hub/omniproxy" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
-    mfdi/omniproxy
+    MFDI-hub/omniproxy
   </div>
 </a>
       </div>
@@ -342,13 +342,13 @@
   </label>
   
     <div class="md-nav__source">
-      <a href="https://github.com/mfdi/omniproxy" title="Go to repository" class="md-source" data-md-component="source">
+      <a href="https://github.com/MFDI-hub/omniproxy" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
-    mfdi/omniproxy
+    MFDI-hub/omniproxy
   </div>
 </a>
     </div>
@@ -5155,9 +5155,7 @@ are identical to the base class; behaviour differs only through these methods.</
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>omniproxy/pool.py</code></summary>
-                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1243">1243</a></span>
-<span class="normal"><a href="#__codelineno-0-1244">1244</a></span>
-<span class="normal"><a href="#__codelineno-0-1245">1245</a></span>
+                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1245">1245</a></span>
 <span class="normal"><a href="#__codelineno-0-1246">1246</a></span>
 <span class="normal"><a href="#__codelineno-0-1247">1247</a></span>
 <span class="normal"><a href="#__codelineno-0-1248">1248</a></span>
@@ -5169,21 +5167,23 @@ are identical to the base class; behaviour differs only through these methods.</
 <span class="normal"><a href="#__codelineno-0-1254">1254</a></span>
 <span class="normal"><a href="#__codelineno-0-1255">1255</a></span>
 <span class="normal"><a href="#__codelineno-0-1256">1256</a></span>
-<span class="normal"><a href="#__codelineno-0-1257">1257</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1243"><a id="__codelineno-0-1243" name="__codelineno-0-1243"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span id="__span-0-1244"><a id="__codelineno-0-1244" name="__codelineno-0-1244"></a>    <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-0-1245"><a id="__codelineno-0-1245" name="__codelineno-0-1245"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
-</span><span id="__span-0-1246"><a id="__codelineno-0-1246" name="__codelineno-0-1246"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-1247"><a id="__codelineno-0-1247" name="__codelineno-0-1247"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-1248"><a id="__codelineno-0-1248" name="__codelineno-0-1248"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-1249"><a id="__codelineno-0-1249" name="__codelineno-0-1249"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-1250"><a id="__codelineno-0-1250" name="__codelineno-0-1250"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1251"><a id="__codelineno-0-1251" name="__codelineno-0-1251"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
-</span><span id="__span-0-1252"><a id="__codelineno-0-1252" name="__codelineno-0-1252"></a>    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span id="__span-0-1253"><a id="__codelineno-0-1253" name="__codelineno-0-1253"></a>        <span class="s2">&quot;ProxyPool is deprecated; use SyncProxyPool for synchronous usage or AsyncProxyPool &quot;</span>
-</span><span id="__span-0-1254"><a id="__codelineno-0-1254" name="__codelineno-0-1254"></a>        <span class="s2">&quot;for asyncio-based usage. Note that `async with` on ProxyPool will fail.&quot;</span><span class="p">,</span>
-</span><span id="__span-0-1255"><a id="__codelineno-0-1255" name="__codelineno-0-1255"></a>        <span class="ne">DeprecationWarning</span><span class="p">,</span>
-</span><span id="__span-0-1256"><a id="__codelineno-0-1256" name="__codelineno-0-1256"></a>        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-0-1257"><a id="__codelineno-0-1257" name="__codelineno-0-1257"></a>    <span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1257">1257</a></span>
+<span class="normal"><a href="#__codelineno-0-1258">1258</a></span>
+<span class="normal"><a href="#__codelineno-0-1259">1259</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1245"><a id="__codelineno-0-1245" name="__codelineno-0-1245"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span id="__span-0-1246"><a id="__codelineno-0-1246" name="__codelineno-0-1246"></a>    <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-0-1247"><a id="__codelineno-0-1247" name="__codelineno-0-1247"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
+</span><span id="__span-0-1248"><a id="__codelineno-0-1248" name="__codelineno-0-1248"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-1249"><a id="__codelineno-0-1249" name="__codelineno-0-1249"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-1250"><a id="__codelineno-0-1250" name="__codelineno-0-1250"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-1251"><a id="__codelineno-0-1251" name="__codelineno-0-1251"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-1252"><a id="__codelineno-0-1252" name="__codelineno-0-1252"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1253"><a id="__codelineno-0-1253" name="__codelineno-0-1253"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
+</span><span id="__span-0-1254"><a id="__codelineno-0-1254" name="__codelineno-0-1254"></a>    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span id="__span-0-1255"><a id="__codelineno-0-1255" name="__codelineno-0-1255"></a>        <span class="s2">&quot;ProxyPool is deprecated; use SyncProxyPool for synchronous usage or AsyncProxyPool &quot;</span>
+</span><span id="__span-0-1256"><a id="__codelineno-0-1256" name="__codelineno-0-1256"></a>        <span class="s2">&quot;for asyncio-based usage. Note that `async with` on ProxyPool will fail.&quot;</span><span class="p">,</span>
+</span><span id="__span-0-1257"><a id="__codelineno-0-1257" name="__codelineno-0-1257"></a>        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span id="__span-0-1258"><a id="__codelineno-0-1258" name="__codelineno-0-1258"></a>        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-1259"><a id="__codelineno-0-1259" name="__codelineno-0-1259"></a>    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
 
@@ -5429,9 +5429,7 @@ ProxyPattern('protocol://ip:port')</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>omniproxy/proxy.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-70">70</a></span>
-<span class="normal"><a href="#__codelineno-0-71">71</a></span>
-<span class="normal"><a href="#__codelineno-0-72">72</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-72">72</a></span>
 <span class="normal"><a href="#__codelineno-0-73">73</a></span>
 <span class="normal"><a href="#__codelineno-0-74">74</a></span>
 <span class="normal"><a href="#__codelineno-0-75">75</a></span>
@@ -5448,26 +5446,28 @@ ProxyPattern('protocol://ip:port')</p>
 <span class="normal"><a href="#__codelineno-0-86">86</a></span>
 <span class="normal"><a href="#__codelineno-0-87">87</a></span>
 <span class="normal"><a href="#__codelineno-0-88">88</a></span>
-<span class="normal"><a href="#__codelineno-0-89">89</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70"></a><span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProxyPattern</span><span class="p">:</span>
-</span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate *pattern* tokens and return an immutable :class:`ProxyPattern` string.</span>
-</span><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72"></a>
-</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-74"><a id="__codelineno-0-74" name="__codelineno-0-74"></a><span class="sd">        pattern (str): Template containing only allowed word tokens.</span>
-</span><span id="__span-0-75"><a id="__codelineno-0-75" name="__codelineno-0-75"></a>
-</span><span id="__span-0-76"><a id="__codelineno-0-76" name="__codelineno-0-76"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-77"><a id="__codelineno-0-77" name="__codelineno-0-77"></a><span class="sd">        ProxyPattern: Validated pattern subclassing ``str``.</span>
-</span><span id="__span-0-78"><a id="__codelineno-0-78" name="__codelineno-0-78"></a>
-</span><span id="__span-0-79"><a id="__codelineno-0-79" name="__codelineno-0-79"></a><span class="sd">    Raises:</span>
-</span><span id="__span-0-80"><a id="__codelineno-0-80" name="__codelineno-0-80"></a><span class="sd">        ValueError: If an unknown token appears in *pattern*.</span>
-</span><span id="__span-0-81"><a id="__codelineno-0-81" name="__codelineno-0-81"></a>
-</span><span id="__span-0-82"><a id="__codelineno-0-82" name="__codelineno-0-82"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-83"><a id="__codelineno-0-83" name="__codelineno-0-83"></a><span class="sd">        &gt;&gt;&gt; ProxyPattern(&quot;protocol://ip:port&quot;)</span>
-</span><span id="__span-0-84"><a id="__codelineno-0-84" name="__codelineno-0-84"></a><span class="sd">        ProxyPattern(&#39;protocol://ip:port&#39;)</span>
-</span><span id="__span-0-85"><a id="__codelineno-0-85" name="__codelineno-0-85"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-86"><a id="__codelineno-0-86" name="__codelineno-0-86"></a>    <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\w+&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="p">):</span>
-</span><span id="__span-0-87"><a id="__codelineno-0-87" name="__codelineno-0-87"></a>        <span class="k">if</span> <span class="n">token</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ALLOWED_WORDS</span><span class="p">:</span>
-</span><span id="__span-0-88"><a id="__codelineno-0-88" name="__codelineno-0-88"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected word </span><span class="si">{</span><span class="n">token</span><span class="si">!r}</span><span class="s2"> in proxy pattern&quot;</span><span class="p">)</span>
-</span><span id="__span-0-89"><a id="__codelineno-0-89" name="__codelineno-0-89"></a>    <span class="k">return</span> <span class="nb">str</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pattern</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-89">89</a></span>
+<span class="normal"><a href="#__codelineno-0-90">90</a></span>
+<span class="normal"><a href="#__codelineno-0-91">91</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72"></a><span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProxyPattern</span><span class="p">:</span>
+</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate *pattern* tokens and return an immutable :class:`ProxyPattern` string.</span>
+</span><span id="__span-0-74"><a id="__codelineno-0-74" name="__codelineno-0-74"></a>
+</span><span id="__span-0-75"><a id="__codelineno-0-75" name="__codelineno-0-75"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-76"><a id="__codelineno-0-76" name="__codelineno-0-76"></a><span class="sd">        pattern (str): Template containing only allowed word tokens.</span>
+</span><span id="__span-0-77"><a id="__codelineno-0-77" name="__codelineno-0-77"></a>
+</span><span id="__span-0-78"><a id="__codelineno-0-78" name="__codelineno-0-78"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-79"><a id="__codelineno-0-79" name="__codelineno-0-79"></a><span class="sd">        ProxyPattern: Validated pattern subclassing ``str``.</span>
+</span><span id="__span-0-80"><a id="__codelineno-0-80" name="__codelineno-0-80"></a>
+</span><span id="__span-0-81"><a id="__codelineno-0-81" name="__codelineno-0-81"></a><span class="sd">    Raises:</span>
+</span><span id="__span-0-82"><a id="__codelineno-0-82" name="__codelineno-0-82"></a><span class="sd">        ValueError: If an unknown token appears in *pattern*.</span>
+</span><span id="__span-0-83"><a id="__codelineno-0-83" name="__codelineno-0-83"></a>
+</span><span id="__span-0-84"><a id="__codelineno-0-84" name="__codelineno-0-84"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-85"><a id="__codelineno-0-85" name="__codelineno-0-85"></a><span class="sd">        &gt;&gt;&gt; ProxyPattern(&quot;protocol://ip:port&quot;)</span>
+</span><span id="__span-0-86"><a id="__codelineno-0-86" name="__codelineno-0-86"></a><span class="sd">        ProxyPattern(&#39;protocol://ip:port&#39;)</span>
+</span><span id="__span-0-87"><a id="__codelineno-0-87" name="__codelineno-0-87"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-88"><a id="__codelineno-0-88" name="__codelineno-0-88"></a>    <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\w+&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="p">):</span>
+</span><span id="__span-0-89"><a id="__codelineno-0-89" name="__codelineno-0-89"></a>        <span class="k">if</span> <span class="n">token</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ALLOWED_WORDS</span><span class="p">:</span>
+</span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected word </span><span class="si">{</span><span class="n">token</span><span class="si">!r}</span><span class="s2"> in proxy pattern&quot;</span><span class="p">)</span>
+</span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a>    <span class="k">return</span> <span class="nb">str</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pattern</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -10116,9 +10116,7 @@ on :class:<code>_PoolState</code>.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>omniproxy/pool.py</code></summary>
-                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-646">646</a></span>
-<span class="normal"><a href="#__codelineno-0-647">647</a></span>
-<span class="normal"><a href="#__codelineno-0-648">648</a></span>
+                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-648">648</a></span>
 <span class="normal"><a href="#__codelineno-0-649">649</a></span>
 <span class="normal"><a href="#__codelineno-0-650">650</a></span>
 <span class="normal"><a href="#__codelineno-0-651">651</a></span>
@@ -10132,23 +10130,25 @@ on :class:<code>_PoolState</code>.</p>
 <span class="normal"><a href="#__codelineno-0-659">659</a></span>
 <span class="normal"><a href="#__codelineno-0-660">660</a></span>
 <span class="normal"><a href="#__codelineno-0-661">661</a></span>
-<span class="normal"><a href="#__codelineno-0-662">662</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-646"><a id="__codelineno-0-646" name="__codelineno-0-646"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span id="__span-0-647"><a id="__codelineno-0-647" name="__codelineno-0-647"></a>    <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-0-648"><a id="__codelineno-0-648" name="__codelineno-0-648"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
-</span><span id="__span-0-649"><a id="__codelineno-0-649" name="__codelineno-0-649"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-650"><a id="__codelineno-0-650" name="__codelineno-0-650"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-651"><a id="__codelineno-0-651" name="__codelineno-0-651"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-652"><a id="__codelineno-0-652" name="__codelineno-0-652"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-653"><a id="__codelineno-0-653" name="__codelineno-0-653"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-654"><a id="__codelineno-0-654" name="__codelineno-0-654"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
-</span><span id="__span-0-655"><a id="__codelineno-0-655" name="__codelineno-0-655"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_condition</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Condition</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">)</span>
-</span><span id="__span-0-656"><a id="__codelineno-0-656" name="__codelineno-0-656"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_sync</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
-</span><span id="__span-0-657"><a id="__codelineno-0-657" name="__codelineno-0-657"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_sync</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
-</span><span id="__span-0-658"><a id="__codelineno-0-658" name="__codelineno-0-658"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_local</span><span class="p">:</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span><span class="p">()</span>
-</span><span id="__span-0-659"><a id="__codelineno-0-659" name="__codelineno-0-659"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_task</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-660"><a id="__codelineno-0-660" name="__codelineno-0-660"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_thread</span><span class="p">:</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-661"><a id="__codelineno-0-661" name="__codelineno-0-661"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_loop</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">AbstractEventLoop</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-662"><a id="__codelineno-0-662" name="__codelineno-0-662"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_monitor</span><span class="p">:</span> <span class="n">HealthMonitor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="normal"><a href="#__codelineno-0-662">662</a></span>
+<span class="normal"><a href="#__codelineno-0-663">663</a></span>
+<span class="normal"><a href="#__codelineno-0-664">664</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-648"><a id="__codelineno-0-648" name="__codelineno-0-648"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span id="__span-0-649"><a id="__codelineno-0-649" name="__codelineno-0-649"></a>    <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-0-650"><a id="__codelineno-0-650" name="__codelineno-0-650"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
+</span><span id="__span-0-651"><a id="__codelineno-0-651" name="__codelineno-0-651"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-652"><a id="__codelineno-0-652" name="__codelineno-0-652"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-653"><a id="__codelineno-0-653" name="__codelineno-0-653"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-654"><a id="__codelineno-0-654" name="__codelineno-0-654"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-655"><a id="__codelineno-0-655" name="__codelineno-0-655"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-656"><a id="__codelineno-0-656" name="__codelineno-0-656"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
+</span><span id="__span-0-657"><a id="__codelineno-0-657" name="__codelineno-0-657"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_condition</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Condition</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">)</span>
+</span><span id="__span-0-658"><a id="__codelineno-0-658" name="__codelineno-0-658"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_sync</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
+</span><span id="__span-0-659"><a id="__codelineno-0-659" name="__codelineno-0-659"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_sync</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+</span><span id="__span-0-660"><a id="__codelineno-0-660" name="__codelineno-0-660"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_local</span><span class="p">:</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span><span class="p">()</span>
+</span><span id="__span-0-661"><a id="__codelineno-0-661" name="__codelineno-0-661"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_task</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-662"><a id="__codelineno-0-662" name="__codelineno-0-662"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_thread</span><span class="p">:</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-663"><a id="__codelineno-0-663" name="__codelineno-0-663"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_loop</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">AbstractEventLoop</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-664"><a id="__codelineno-0-664" name="__codelineno-0-664"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_monitor</span><span class="p">:</span> <span class="n">HealthMonitor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
 
@@ -10185,9 +10185,7 @@ a sync <code>reset_pool</code> does not signal async waiters by design.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>omniproxy/pool.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-790">790</a></span>
-<span class="normal"><a href="#__codelineno-0-791">791</a></span>
-<span class="normal"><a href="#__codelineno-0-792">792</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-792">792</a></span>
 <span class="normal"><a href="#__codelineno-0-793">793</a></span>
 <span class="normal"><a href="#__codelineno-0-794">794</a></span>
 <span class="normal"><a href="#__codelineno-0-795">795</a></span>
@@ -10195,17 +10193,19 @@ a sync <code>reset_pool</code> does not signal async waiters by design.</p>
 <span class="normal"><a href="#__codelineno-0-797">797</a></span>
 <span class="normal"><a href="#__codelineno-0-798">798</a></span>
 <span class="normal"><a href="#__codelineno-0-799">799</a></span>
-<span class="normal"><a href="#__codelineno-0-800">800</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-790"><a id="__codelineno-0-790" name="__codelineno-0-790"></a><span class="k">def</span><span class="w"> </span><span class="nf">reset_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-791"><a id="__codelineno-0-791" name="__codelineno-0-791"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Reset active state; sync-only wake (no :meth:`_notify_async_condition`).</span>
-</span><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a>
-</span><span id="__span-0-793"><a id="__codelineno-0-793" name="__codelineno-0-793"></a><span class="sd">    Mixed sync/async pools are unsupported: unlike :meth:`BaseProxyPool._merge_refreshed_proxies`,</span>
-</span><span id="__span-0-794"><a id="__codelineno-0-794" name="__codelineno-0-794"></a><span class="sd">    a sync ``reset_pool`` does not signal async waiters by design.</span>
-</span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-796"><a id="__codelineno-0-796" name="__codelineno-0-796"></a>    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span id="__span-0-797"><a id="__codelineno-0-797" name="__codelineno-0-797"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
-</span><span id="__span-0-798"><a id="__codelineno-0-798" name="__codelineno-0-798"></a>            <span class="k">raise</span> <span class="n">PoolClosedError</span><span class="p">(</span><span class="s2">&quot;proxy pool is closed&quot;</span><span class="p">)</span>
-</span><span id="__span-0-799"><a id="__codelineno-0-799" name="__codelineno-0-799"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">_nolock_reset</span><span class="p">()</span>
-</span><span id="__span-0-800"><a id="__codelineno-0-800" name="__codelineno-0-800"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_notify_sync_condition</span><span class="p">(</span><span class="n">notify_all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-800">800</a></span>
+<span class="normal"><a href="#__codelineno-0-801">801</a></span>
+<span class="normal"><a href="#__codelineno-0-802">802</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-792"><a id="__codelineno-0-792" name="__codelineno-0-792"></a><span class="k">def</span><span class="w"> </span><span class="nf">reset_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-793"><a id="__codelineno-0-793" name="__codelineno-0-793"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Reset active state; sync-only wake (no :meth:`_notify_async_condition`).</span>
+</span><span id="__span-0-794"><a id="__codelineno-0-794" name="__codelineno-0-794"></a>
+</span><span id="__span-0-795"><a id="__codelineno-0-795" name="__codelineno-0-795"></a><span class="sd">    Mixed sync/async pools are unsupported: unlike :meth:`BaseProxyPool._merge_refreshed_proxies`,</span>
+</span><span id="__span-0-796"><a id="__codelineno-0-796" name="__codelineno-0-796"></a><span class="sd">    a sync ``reset_pool`` does not signal async waiters by design.</span>
+</span><span id="__span-0-797"><a id="__codelineno-0-797" name="__codelineno-0-797"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-798"><a id="__codelineno-0-798" name="__codelineno-0-798"></a>    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span id="__span-0-799"><a id="__codelineno-0-799" name="__codelineno-0-799"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+</span><span id="__span-0-800"><a id="__codelineno-0-800" name="__codelineno-0-800"></a>            <span class="k">raise</span> <span class="n">PoolClosedError</span><span class="p">(</span><span class="s2">&quot;proxy pool is closed&quot;</span><span class="p">)</span>
+</span><span id="__span-0-801"><a id="__codelineno-0-801" name="__codelineno-0-801"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">_nolock_reset</span><span class="p">()</span>
+</span><span id="__span-0-802"><a id="__codelineno-0-802" name="__codelineno-0-802"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_notify_sync_condition</span><span class="p">(</span><span class="n">notify_all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -10260,9 +10260,7 @@ a sync <code>reset_pool</code> does not signal async waiters by design.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>omniproxy/pool.py</code></summary>
-                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-903">903</a></span>
-<span class="normal"><a href="#__codelineno-0-904">904</a></span>
-<span class="normal"><a href="#__codelineno-0-905">905</a></span>
+                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-905">905</a></span>
 <span class="normal"><a href="#__codelineno-0-906">906</a></span>
 <span class="normal"><a href="#__codelineno-0-907">907</a></span>
 <span class="normal"><a href="#__codelineno-0-908">908</a></span>
@@ -10282,29 +10280,31 @@ a sync <code>reset_pool</code> does not signal async waiters by design.</p>
 <span class="normal"><a href="#__codelineno-0-922">922</a></span>
 <span class="normal"><a href="#__codelineno-0-923">923</a></span>
 <span class="normal"><a href="#__codelineno-0-924">924</a></span>
-<span class="normal"><a href="#__codelineno-0-925">925</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-903"><a id="__codelineno-0-903" name="__codelineno-0-903"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span id="__span-0-904"><a id="__codelineno-0-904" name="__codelineno-0-904"></a>    <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-0-905"><a id="__codelineno-0-905" name="__codelineno-0-905"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
-</span><span id="__span-0-906"><a id="__codelineno-0-906" name="__codelineno-0-906"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-907"><a id="__codelineno-0-907" name="__codelineno-0-907"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-908"><a id="__codelineno-0-908" name="__codelineno-0-908"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-909"><a id="__codelineno-0-909" name="__codelineno-0-909"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-910"><a id="__codelineno-0-910" name="__codelineno-0-910"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-911"><a id="__codelineno-0-911" name="__codelineno-0-911"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
-</span><span id="__span-0-912"><a id="__codelineno-0-912" name="__codelineno-0-912"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_lock_obj</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Lock</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-913"><a id="__codelineno-0-913" name="__codelineno-0-913"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_condition_obj</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Condition</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-914"><a id="__codelineno-0-914" name="__codelineno-0-914"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_consumer_loop</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">AbstractEventLoop</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-915"><a id="__codelineno-0-915" name="__codelineno-0-915"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_exit_carry</span><span class="p">:</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">[</span><span class="n">_AsyncExitHold</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-916"><a id="__codelineno-0-916" name="__codelineno-0-916"></a>        <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;omniproxy_pool_async_exit_carry&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-917"><a id="__codelineno-0-917" name="__codelineno-0-917"></a>    <span class="p">)</span>
-</span><span id="__span-0-918"><a id="__codelineno-0-918" name="__codelineno-0-918"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_notify_tasks</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-</span><span id="__span-0-919"><a id="__codelineno-0-919" name="__codelineno-0-919"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_notify_tasks_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
-</span><span id="__span-0-920"><a id="__codelineno-0-920" name="__codelineno-0-920"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_async_obj</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-921"><a id="__codelineno-0-921" name="__codelineno-0-921"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_task_proxy</span><span class="p">:</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">(</span>
-</span><span id="__span-0-922"><a id="__codelineno-0-922" name="__codelineno-0-922"></a>        <span class="s2">&quot;task_proxy&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
-</span><span id="__span-0-923"><a id="__codelineno-0-923" name="__codelineno-0-923"></a>    <span class="p">)</span>
-</span><span id="__span-0-924"><a id="__codelineno-0-924" name="__codelineno-0-924"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_task</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-925"><a id="__codelineno-0-925" name="__codelineno-0-925"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_monitor</span><span class="p">:</span> <span class="n">HealthMonitor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="normal"><a href="#__codelineno-0-925">925</a></span>
+<span class="normal"><a href="#__codelineno-0-926">926</a></span>
+<span class="normal"><a href="#__codelineno-0-927">927</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-905"><a id="__codelineno-0-905" name="__codelineno-0-905"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span id="__span-0-906"><a id="__codelineno-0-906" name="__codelineno-0-906"></a>    <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-0-907"><a id="__codelineno-0-907" name="__codelineno-0-907"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
+</span><span id="__span-0-908"><a id="__codelineno-0-908" name="__codelineno-0-908"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-909"><a id="__codelineno-0-909" name="__codelineno-0-909"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-910"><a id="__codelineno-0-910" name="__codelineno-0-910"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-911"><a id="__codelineno-0-911" name="__codelineno-0-911"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-912"><a id="__codelineno-0-912" name="__codelineno-0-912"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-913"><a id="__codelineno-0-913" name="__codelineno-0-913"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
+</span><span id="__span-0-914"><a id="__codelineno-0-914" name="__codelineno-0-914"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_lock_obj</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Lock</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-915"><a id="__codelineno-0-915" name="__codelineno-0-915"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_condition_obj</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Condition</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-916"><a id="__codelineno-0-916" name="__codelineno-0-916"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_consumer_loop</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">AbstractEventLoop</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-917"><a id="__codelineno-0-917" name="__codelineno-0-917"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_exit_carry</span><span class="p">:</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">[</span><span class="n">_AsyncExitHold</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-918"><a id="__codelineno-0-918" name="__codelineno-0-918"></a>        <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;omniproxy_pool_async_exit_carry&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-919"><a id="__codelineno-0-919" name="__codelineno-0-919"></a>    <span class="p">)</span>
+</span><span id="__span-0-920"><a id="__codelineno-0-920" name="__codelineno-0-920"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_notify_tasks</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+</span><span id="__span-0-921"><a id="__codelineno-0-921" name="__codelineno-0-921"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_notify_tasks_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+</span><span id="__span-0-922"><a id="__codelineno-0-922" name="__codelineno-0-922"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_async_obj</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-923"><a id="__codelineno-0-923" name="__codelineno-0-923"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_task_proxy</span><span class="p">:</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">(</span>
+</span><span id="__span-0-924"><a id="__codelineno-0-924" name="__codelineno-0-924"></a>        <span class="s2">&quot;task_proxy&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
+</span><span id="__span-0-925"><a id="__codelineno-0-925" name="__codelineno-0-925"></a>    <span class="p">)</span>
+</span><span id="__span-0-926"><a id="__codelineno-0-926" name="__codelineno-0-926"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_task</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-927"><a id="__codelineno-0-927" name="__codelineno-0-927"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_health_monitor</span><span class="p">:</span> <span class="n">HealthMonitor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
 
@@ -10347,9 +10347,7 @@ when <code>await aclose()</code> completes.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>omniproxy/pool.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1186">1186</a></span>
-<span class="normal"><a href="#__codelineno-0-1187">1187</a></span>
-<span class="normal"><a href="#__codelineno-0-1188">1188</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1188">1188</a></span>
 <span class="normal"><a href="#__codelineno-0-1189">1189</a></span>
 <span class="normal"><a href="#__codelineno-0-1190">1190</a></span>
 <span class="normal"><a href="#__codelineno-0-1191">1191</a></span>
@@ -10393,53 +10391,55 @@ when <code>await aclose()</code> completes.</p>
 <span class="normal"><a href="#__codelineno-0-1229">1229</a></span>
 <span class="normal"><a href="#__codelineno-0-1230">1230</a></span>
 <span class="normal"><a href="#__codelineno-0-1231">1231</a></span>
-<span class="normal"><a href="#__codelineno-0-1232">1232</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1186"><a id="__codelineno-0-1186" name="__codelineno-0-1186"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">aclose</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1187"><a id="__codelineno-0-1187" name="__codelineno-0-1187"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Close the pool and tear down async coordination.</span>
-</span><span id="__span-0-1188"><a id="__codelineno-0-1188" name="__codelineno-0-1188"></a>
-</span><span id="__span-0-1189"><a id="__codelineno-0-1189" name="__codelineno-0-1189"></a><span class="sd">    The final ``notify_all`` for blocked async waiters is scheduled on the consumer loop and</span>
-</span><span id="__span-0-1190"><a id="__codelineno-0-1190" name="__codelineno-0-1190"></a><span class="sd">    may run *after* this coroutine returns; ``cond`` is captured by closure before lazy</span>
-</span><span id="__span-0-1191"><a id="__codelineno-0-1191" name="__codelineno-0-1191"></a><span class="sd">    condition fields are cleared. Callers should not assume waiters have already been woken</span>
-</span><span id="__span-0-1192"><a id="__codelineno-0-1192" name="__codelineno-0-1192"></a><span class="sd">    when ``await aclose()`` completes.</span>
-</span><span id="__span-0-1193"><a id="__codelineno-0-1193" name="__codelineno-0-1193"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1194"><a id="__codelineno-0-1194" name="__codelineno-0-1194"></a>    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span id="__span-0-1195"><a id="__codelineno-0-1195" name="__codelineno-0-1195"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
-</span><span id="__span-0-1196"><a id="__codelineno-0-1196" name="__codelineno-0-1196"></a>            <span class="k">return</span>
-</span><span id="__span-0-1197"><a id="__codelineno-0-1197" name="__codelineno-0-1197"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-0-1198"><a id="__codelineno-0-1198" name="__codelineno-0-1198"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_cancel_pending_async_notify_tasks</span><span class="p">()</span>
-</span><span id="__span-0-1199"><a id="__codelineno-0-1199" name="__codelineno-0-1199"></a>    <span class="n">loop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_async_consumer_loop</span>
-</span><span id="__span-0-1200"><a id="__codelineno-0-1200" name="__codelineno-0-1200"></a>    <span class="n">cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_async_condition_obj</span>
-</span><span id="__span-0-1201"><a id="__codelineno-0-1201" name="__codelineno-0-1201"></a>    <span class="k">if</span> <span class="n">loop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">loop</span><span class="o">.</span><span class="n">is_running</span><span class="p">()</span> <span class="ow">and</span> <span class="n">cond</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1202"><a id="__codelineno-0-1202" name="__codelineno-0-1202"></a>
-</span><span id="__span-0-1203"><a id="__codelineno-0-1203" name="__codelineno-0-1203"></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_do_wake</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1204"><a id="__codelineno-0-1204" name="__codelineno-0-1204"></a>            <span class="c1"># Untracked one-shot task: swallow failures; CancelledError is intentional here.</span>
-</span><span id="__span-0-1205"><a id="__codelineno-0-1205" name="__codelineno-0-1205"></a>            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
-</span><span id="__span-0-1206"><a id="__codelineno-0-1206" name="__codelineno-0-1206"></a>                <span class="k">async</span> <span class="k">with</span> <span class="n">cond</span><span class="p">:</span>
-</span><span id="__span-0-1207"><a id="__codelineno-0-1207" name="__codelineno-0-1207"></a>                    <span class="n">cond</span><span class="o">.</span><span class="n">notify_all</span><span class="p">()</span>
-</span><span id="__span-0-1208"><a id="__codelineno-0-1208" name="__codelineno-0-1208"></a>
-</span><span id="__span-0-1209"><a id="__codelineno-0-1209" name="__codelineno-0-1209"></a>        <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-1210"><a id="__codelineno-0-1210" name="__codelineno-0-1210"></a>            <span class="n">running</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_running_loop</span><span class="p">()</span>
-</span><span id="__span-0-1211"><a id="__codelineno-0-1211" name="__codelineno-0-1211"></a>        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
-</span><span id="__span-0-1212"><a id="__codelineno-0-1212" name="__codelineno-0-1212"></a>            <span class="n">running</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-1213"><a id="__codelineno-0-1213" name="__codelineno-0-1213"></a>
-</span><span id="__span-0-1214"><a id="__codelineno-0-1214" name="__codelineno-0-1214"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">_wake_done</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1215"><a id="__codelineno-0-1215" name="__codelineno-0-1215"></a>            <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">cancelled</span><span class="p">():</span>
-</span><span id="__span-0-1216"><a id="__codelineno-0-1216" name="__codelineno-0-1216"></a>                <span class="k">return</span>
-</span><span id="__span-0-1217"><a id="__codelineno-0-1217" name="__codelineno-0-1217"></a>            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">BaseException</span><span class="p">):</span>
-</span><span id="__span-0-1218"><a id="__codelineno-0-1218" name="__codelineno-0-1218"></a>                <span class="n">_</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">exception</span><span class="p">()</span>
-</span><span id="__span-0-1219"><a id="__codelineno-0-1219" name="__codelineno-0-1219"></a>
-</span><span id="__span-0-1220"><a id="__codelineno-0-1220" name="__codelineno-0-1220"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">_schedule_wake</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1221"><a id="__codelineno-0-1221" name="__codelineno-0-1221"></a>            <span class="c1"># Untracked wake; see :meth:`aclose` docstring.</span>
-</span><span id="__span-0-1222"><a id="__codelineno-0-1222" name="__codelineno-0-1222"></a>            <span class="n">wake_task</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">_do_wake</span><span class="p">())</span>
-</span><span id="__span-0-1223"><a id="__codelineno-0-1223" name="__codelineno-0-1223"></a>            <span class="n">wake_task</span><span class="o">.</span><span class="n">add_done_callback</span><span class="p">(</span><span class="n">_wake_done</span><span class="p">)</span>
-</span><span id="__span-0-1224"><a id="__codelineno-0-1224" name="__codelineno-0-1224"></a>
-</span><span id="__span-0-1225"><a id="__codelineno-0-1225" name="__codelineno-0-1225"></a>        <span class="k">if</span> <span class="n">running</span> <span class="ow">is</span> <span class="n">loop</span><span class="p">:</span>
-</span><span id="__span-0-1226"><a id="__codelineno-0-1226" name="__codelineno-0-1226"></a>            <span class="n">_schedule_wake</span><span class="p">()</span>
-</span><span id="__span-0-1227"><a id="__codelineno-0-1227" name="__codelineno-0-1227"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-1228"><a id="__codelineno-0-1228" name="__codelineno-0-1228"></a>            <span class="n">loop</span><span class="o">.</span><span class="n">call_soon_threadsafe</span><span class="p">(</span><span class="n">_schedule_wake</span><span class="p">)</span>
-</span><span id="__span-0-1229"><a id="__codelineno-0-1229" name="__codelineno-0-1229"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_condition_obj</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-1230"><a id="__codelineno-0-1230" name="__codelineno-0-1230"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_lock_obj</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-1231"><a id="__codelineno-0-1231" name="__codelineno-0-1231"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_async_obj</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-1232"><a id="__codelineno-0-1232" name="__codelineno-0-1232"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">stop_monitoring</span><span class="p">()</span>
+<span class="normal"><a href="#__codelineno-0-1232">1232</a></span>
+<span class="normal"><a href="#__codelineno-0-1233">1233</a></span>
+<span class="normal"><a href="#__codelineno-0-1234">1234</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1188"><a id="__codelineno-0-1188" name="__codelineno-0-1188"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">aclose</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1189"><a id="__codelineno-0-1189" name="__codelineno-0-1189"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Close the pool and tear down async coordination.</span>
+</span><span id="__span-0-1190"><a id="__codelineno-0-1190" name="__codelineno-0-1190"></a>
+</span><span id="__span-0-1191"><a id="__codelineno-0-1191" name="__codelineno-0-1191"></a><span class="sd">    The final ``notify_all`` for blocked async waiters is scheduled on the consumer loop and</span>
+</span><span id="__span-0-1192"><a id="__codelineno-0-1192" name="__codelineno-0-1192"></a><span class="sd">    may run *after* this coroutine returns; ``cond`` is captured by closure before lazy</span>
+</span><span id="__span-0-1193"><a id="__codelineno-0-1193" name="__codelineno-0-1193"></a><span class="sd">    condition fields are cleared. Callers should not assume waiters have already been woken</span>
+</span><span id="__span-0-1194"><a id="__codelineno-0-1194" name="__codelineno-0-1194"></a><span class="sd">    when ``await aclose()`` completes.</span>
+</span><span id="__span-0-1195"><a id="__codelineno-0-1195" name="__codelineno-0-1195"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1196"><a id="__codelineno-0-1196" name="__codelineno-0-1196"></a>    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span id="__span-0-1197"><a id="__codelineno-0-1197" name="__codelineno-0-1197"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span><span class="p">:</span>
+</span><span id="__span-0-1198"><a id="__codelineno-0-1198" name="__codelineno-0-1198"></a>            <span class="k">return</span>
+</span><span id="__span-0-1199"><a id="__codelineno-0-1199" name="__codelineno-0-1199"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_closed</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-0-1200"><a id="__codelineno-0-1200" name="__codelineno-0-1200"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_cancel_pending_async_notify_tasks</span><span class="p">()</span>
+</span><span id="__span-0-1201"><a id="__codelineno-0-1201" name="__codelineno-0-1201"></a>    <span class="n">loop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_async_consumer_loop</span>
+</span><span id="__span-0-1202"><a id="__codelineno-0-1202" name="__codelineno-0-1202"></a>    <span class="n">cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_async_condition_obj</span>
+</span><span id="__span-0-1203"><a id="__codelineno-0-1203" name="__codelineno-0-1203"></a>    <span class="k">if</span> <span class="n">loop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">loop</span><span class="o">.</span><span class="n">is_running</span><span class="p">()</span> <span class="ow">and</span> <span class="n">cond</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1204"><a id="__codelineno-0-1204" name="__codelineno-0-1204"></a>
+</span><span id="__span-0-1205"><a id="__codelineno-0-1205" name="__codelineno-0-1205"></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_do_wake</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1206"><a id="__codelineno-0-1206" name="__codelineno-0-1206"></a>            <span class="c1"># Untracked one-shot task: swallow failures; CancelledError is intentional here.</span>
+</span><span id="__span-0-1207"><a id="__codelineno-0-1207" name="__codelineno-0-1207"></a>            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+</span><span id="__span-0-1208"><a id="__codelineno-0-1208" name="__codelineno-0-1208"></a>                <span class="k">async</span> <span class="k">with</span> <span class="n">cond</span><span class="p">:</span>
+</span><span id="__span-0-1209"><a id="__codelineno-0-1209" name="__codelineno-0-1209"></a>                    <span class="n">cond</span><span class="o">.</span><span class="n">notify_all</span><span class="p">()</span>
+</span><span id="__span-0-1210"><a id="__codelineno-0-1210" name="__codelineno-0-1210"></a>
+</span><span id="__span-0-1211"><a id="__codelineno-0-1211" name="__codelineno-0-1211"></a>        <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-0-1212"><a id="__codelineno-0-1212" name="__codelineno-0-1212"></a>            <span class="n">running</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_running_loop</span><span class="p">()</span>
+</span><span id="__span-0-1213"><a id="__codelineno-0-1213" name="__codelineno-0-1213"></a>        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+</span><span id="__span-0-1214"><a id="__codelineno-0-1214" name="__codelineno-0-1214"></a>            <span class="n">running</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-1215"><a id="__codelineno-0-1215" name="__codelineno-0-1215"></a>
+</span><span id="__span-0-1216"><a id="__codelineno-0-1216" name="__codelineno-0-1216"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">_wake_done</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1217"><a id="__codelineno-0-1217" name="__codelineno-0-1217"></a>            <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">cancelled</span><span class="p">():</span>
+</span><span id="__span-0-1218"><a id="__codelineno-0-1218" name="__codelineno-0-1218"></a>                <span class="k">return</span>
+</span><span id="__span-0-1219"><a id="__codelineno-0-1219" name="__codelineno-0-1219"></a>            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">BaseException</span><span class="p">):</span>
+</span><span id="__span-0-1220"><a id="__codelineno-0-1220" name="__codelineno-0-1220"></a>                <span class="n">_</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">exception</span><span class="p">()</span>
+</span><span id="__span-0-1221"><a id="__codelineno-0-1221" name="__codelineno-0-1221"></a>
+</span><span id="__span-0-1222"><a id="__codelineno-0-1222" name="__codelineno-0-1222"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">_schedule_wake</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1223"><a id="__codelineno-0-1223" name="__codelineno-0-1223"></a>            <span class="c1"># Untracked wake; see :meth:`aclose` docstring.</span>
+</span><span id="__span-0-1224"><a id="__codelineno-0-1224" name="__codelineno-0-1224"></a>            <span class="n">wake_task</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">_do_wake</span><span class="p">())</span>
+</span><span id="__span-0-1225"><a id="__codelineno-0-1225" name="__codelineno-0-1225"></a>            <span class="n">wake_task</span><span class="o">.</span><span class="n">add_done_callback</span><span class="p">(</span><span class="n">_wake_done</span><span class="p">)</span>
+</span><span id="__span-0-1226"><a id="__codelineno-0-1226" name="__codelineno-0-1226"></a>
+</span><span id="__span-0-1227"><a id="__codelineno-0-1227" name="__codelineno-0-1227"></a>        <span class="k">if</span> <span class="n">running</span> <span class="ow">is</span> <span class="n">loop</span><span class="p">:</span>
+</span><span id="__span-0-1228"><a id="__codelineno-0-1228" name="__codelineno-0-1228"></a>            <span class="n">_schedule_wake</span><span class="p">()</span>
+</span><span id="__span-0-1229"><a id="__codelineno-0-1229" name="__codelineno-0-1229"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-0-1230"><a id="__codelineno-0-1230" name="__codelineno-0-1230"></a>            <span class="n">loop</span><span class="o">.</span><span class="n">call_soon_threadsafe</span><span class="p">(</span><span class="n">_schedule_wake</span><span class="p">)</span>
+</span><span id="__span-0-1231"><a id="__codelineno-0-1231" name="__codelineno-0-1231"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_condition_obj</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-1232"><a id="__codelineno-0-1232" name="__codelineno-0-1232"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_async_lock_obj</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-1233"><a id="__codelineno-0-1233" name="__codelineno-0-1233"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_event_async_obj</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-1234"><a id="__codelineno-0-1234" name="__codelineno-0-1234"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">stop_monitoring</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -10494,9 +10494,7 @@ when <code>await aclose()</code> completes.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>omniproxy/pool.py</code></summary>
-                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1243">1243</a></span>
-<span class="normal"><a href="#__codelineno-0-1244">1244</a></span>
-<span class="normal"><a href="#__codelineno-0-1245">1245</a></span>
+                    <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1245">1245</a></span>
 <span class="normal"><a href="#__codelineno-0-1246">1246</a></span>
 <span class="normal"><a href="#__codelineno-0-1247">1247</a></span>
 <span class="normal"><a href="#__codelineno-0-1248">1248</a></span>
@@ -10508,21 +10506,23 @@ when <code>await aclose()</code> completes.</p>
 <span class="normal"><a href="#__codelineno-0-1254">1254</a></span>
 <span class="normal"><a href="#__codelineno-0-1255">1255</a></span>
 <span class="normal"><a href="#__codelineno-0-1256">1256</a></span>
-<span class="normal"><a href="#__codelineno-0-1257">1257</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1243"><a id="__codelineno-0-1243" name="__codelineno-0-1243"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span id="__span-0-1244"><a id="__codelineno-0-1244" name="__codelineno-0-1244"></a>    <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-0-1245"><a id="__codelineno-0-1245" name="__codelineno-0-1245"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
-</span><span id="__span-0-1246"><a id="__codelineno-0-1246" name="__codelineno-0-1246"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-1247"><a id="__codelineno-0-1247" name="__codelineno-0-1247"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-1248"><a id="__codelineno-0-1248" name="__codelineno-0-1248"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-1249"><a id="__codelineno-0-1249" name="__codelineno-0-1249"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-1250"><a id="__codelineno-0-1250" name="__codelineno-0-1250"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1251"><a id="__codelineno-0-1251" name="__codelineno-0-1251"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
-</span><span id="__span-0-1252"><a id="__codelineno-0-1252" name="__codelineno-0-1252"></a>    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span id="__span-0-1253"><a id="__codelineno-0-1253" name="__codelineno-0-1253"></a>        <span class="s2">&quot;ProxyPool is deprecated; use SyncProxyPool for synchronous usage or AsyncProxyPool &quot;</span>
-</span><span id="__span-0-1254"><a id="__codelineno-0-1254" name="__codelineno-0-1254"></a>        <span class="s2">&quot;for asyncio-based usage. Note that `async with` on ProxyPool will fail.&quot;</span><span class="p">,</span>
-</span><span id="__span-0-1255"><a id="__codelineno-0-1255" name="__codelineno-0-1255"></a>        <span class="ne">DeprecationWarning</span><span class="p">,</span>
-</span><span id="__span-0-1256"><a id="__codelineno-0-1256" name="__codelineno-0-1256"></a>        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-0-1257"><a id="__codelineno-0-1257" name="__codelineno-0-1257"></a>    <span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1257">1257</a></span>
+<span class="normal"><a href="#__codelineno-0-1258">1258</a></span>
+<span class="normal"><a href="#__codelineno-0-1259">1259</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1245"><a id="__codelineno-0-1245" name="__codelineno-0-1245"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span id="__span-0-1246"><a id="__codelineno-0-1246" name="__codelineno-0-1246"></a>    <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-0-1247"><a id="__codelineno-0-1247" name="__codelineno-0-1247"></a>    <span class="n">proxies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Proxy</span> <span class="o">|</span> <span class="nb">str</span><span class="p">],</span>
+</span><span id="__span-0-1248"><a id="__codelineno-0-1248" name="__codelineno-0-1248"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">PoolConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-1249"><a id="__codelineno-0-1249" name="__codelineno-0-1249"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-1250"><a id="__codelineno-0-1250" name="__codelineno-0-1250"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="n">Strategy</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-1251"><a id="__codelineno-0-1251" name="__codelineno-0-1251"></a>    <span class="n">cooldown</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-1252"><a id="__codelineno-0-1252" name="__codelineno-0-1252"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1253"><a id="__codelineno-0-1253" name="__codelineno-0-1253"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">proxies</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">cooldown</span><span class="o">=</span><span class="n">cooldown</span><span class="p">)</span>
+</span><span id="__span-0-1254"><a id="__codelineno-0-1254" name="__codelineno-0-1254"></a>    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span id="__span-0-1255"><a id="__codelineno-0-1255" name="__codelineno-0-1255"></a>        <span class="s2">&quot;ProxyPool is deprecated; use SyncProxyPool for synchronous usage or AsyncProxyPool &quot;</span>
+</span><span id="__span-0-1256"><a id="__codelineno-0-1256" name="__codelineno-0-1256"></a>        <span class="s2">&quot;for asyncio-based usage. Note that `async with` on ProxyPool will fail.&quot;</span><span class="p">,</span>
+</span><span id="__span-0-1257"><a id="__codelineno-0-1257" name="__codelineno-0-1257"></a>        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span id="__span-0-1258"><a id="__codelineno-0-1258" name="__codelineno-0-1258"></a>        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-1259"><a id="__codelineno-0-1259" name="__codelineno-0-1259"></a>    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
 
@@ -13231,7 +13231,10 @@ rotation_url: Optional[:class:<code>str</code>]
 <span class="normal"><a href="#__codelineno-0-244">244</a></span>
 <span class="normal"><a href="#__codelineno-0-245">245</a></span>
 <span class="normal"><a href="#__codelineno-0-246">246</a></span>
-<span class="normal"><a href="#__codelineno-0-247">247</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a><span class="nd">@classmethod</span>
+<span class="normal"><a href="#__codelineno-0-247">247</a></span>
+<span class="normal"><a href="#__codelineno-0-248">248</a></span>
+<span class="normal"><a href="#__codelineno-0-249">249</a></span>
+<span class="normal"><a href="#__codelineno-0-250">250</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a><span class="nd">@classmethod</span>
 </span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a><span class="k">def</span><span class="w"> </span><span class="nf">from_match</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">groups</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">OmniproxyParser</span><span class="p">:</span>
 </span><span id="__span-0-206"><a id="__codelineno-0-206" name="__codelineno-0-206"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a parser struct from a regex ``groupdict`` mapping.</span>
 </span><span id="__span-0-207"><a id="__codelineno-0-207" name="__codelineno-0-207"></a>
@@ -13267,14 +13270,17 @@ rotation_url: Optional[:class:<code>str</code>]
 </span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a>    <span class="k">assert</span> <span class="n">_ip</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">_port</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
 </span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a>        <span class="s2">&quot;regex match must capture &#39;ip&#39; and &#39;port&#39; groups&quot;</span>
 </span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a>    <span class="p">)</span>
-</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
-</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a>        <span class="n">protocol</span><span class="o">=</span><span class="n">raw_proto</span><span class="p">,</span>  <span class="c1"># type: ignore[arg-type]</span>
-</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a>        <span class="n">ip</span><span class="o">=</span><span class="n">_ip</span><span class="p">,</span>
-</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a>        <span class="n">port</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">_port</span><span class="p">),</span>
-</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a>        <span class="n">username</span><span class="o">=</span><span class="n">groups</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;username&quot;</span><span class="p">),</span>
-</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a>        <span class="n">password</span><span class="o">=</span><span class="n">groups</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;password&quot;</span><span class="p">),</span>
-</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a>        <span class="n">rotation_url</span><span class="o">=</span><span class="n">groups</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">),</span>
-</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a>    <span class="p">)</span>
+</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a>    <span class="n">_proto</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="s2">&quot;https&quot;</span><span class="p">,</span> <span class="s2">&quot;socks5&quot;</span><span class="p">,</span> <span class="s2">&quot;socks4&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span>
+</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a>        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="s2">&quot;https&quot;</span><span class="p">,</span> <span class="s2">&quot;socks5&quot;</span><span class="p">,</span> <span class="s2">&quot;socks4&quot;</span><span class="p">],</span> <span class="n">raw_proto</span>
+</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a>    <span class="p">)</span>
+</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a>        <span class="n">protocol</span><span class="o">=</span><span class="n">_proto</span><span class="p">,</span>
+</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a>        <span class="n">ip</span><span class="o">=</span><span class="n">_ip</span><span class="p">,</span>
+</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a>        <span class="n">port</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">_port</span><span class="p">),</span>
+</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a>        <span class="n">username</span><span class="o">=</span><span class="n">groups</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;username&quot;</span><span class="p">),</span>
+</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a>        <span class="n">password</span><span class="o">=</span><span class="n">groups</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;password&quot;</span><span class="p">),</span>
+</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a>        <span class="n">rotation_url</span><span class="o">=</span><span class="n">groups</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">),</span>
+</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a>    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -13394,10 +13400,7 @@ get_formatted_proxy_string(p, "ip:port")
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>omniproxy/utils.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-276">276</a></span>
-<span class="normal"><a href="#__codelineno-0-277">277</a></span>
-<span class="normal"><a href="#__codelineno-0-278">278</a></span>
-<span class="normal"><a href="#__codelineno-0-279">279</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-279">279</a></span>
 <span class="normal"><a href="#__codelineno-0-280">280</a></span>
 <span class="normal"><a href="#__codelineno-0-281">281</a></span>
 <span class="normal"><a href="#__codelineno-0-282">282</a></span>
@@ -13446,59 +13449,62 @@ get_formatted_proxy_string(p, "ip:port")
 <span class="normal"><a href="#__codelineno-0-325">325</a></span>
 <span class="normal"><a href="#__codelineno-0-326">326</a></span>
 <span class="normal"><a href="#__codelineno-0-327">327</a></span>
-<span class="normal"><a href="#__codelineno-0-328">328</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_formatted_proxy_string</span><span class="p">(</span><span class="n">proxy</span><span class="p">:</span> <span class="n">Proxy</span> <span class="o">|</span> <span class="n">OmniproxyParser</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">ProxyPattern</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Render *proxy* using *pattern* field tokens (protocol, username, password, ip, port, rotation_url).</span>
-</span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a>
-</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a><span class="sd">        proxy (Proxy | OmniproxyParser): Source values.</span>
-</span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a><span class="sd">        pattern (str | ProxyPattern): Template with allowed field tokens.</span>
-</span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a>
-</span><span id="__span-0-283"><a id="__codelineno-0-283" name="__codelineno-0-283"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-284"><a id="__codelineno-0-284" name="__codelineno-0-284"></a><span class="sd">        str: Formatted proxy string.</span>
+<span class="normal"><a href="#__codelineno-0-328">328</a></span>
+<span class="normal"><a href="#__codelineno-0-329">329</a></span>
+<span class="normal"><a href="#__codelineno-0-330">330</a></span>
+<span class="normal"><a href="#__codelineno-0-331">331</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_formatted_proxy_string</span><span class="p">(</span><span class="n">proxy</span><span class="p">:</span> <span class="n">Proxy</span> <span class="o">|</span> <span class="n">OmniproxyParser</span><span class="p">,</span> <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">ProxyPattern</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Render *proxy* using *pattern* field tokens (protocol, username, password, ip, port, rotation_url).</span>
+</span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>
+</span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-283"><a id="__codelineno-0-283" name="__codelineno-0-283"></a><span class="sd">        proxy (Proxy | OmniproxyParser): Source values.</span>
+</span><span id="__span-0-284"><a id="__codelineno-0-284" name="__codelineno-0-284"></a><span class="sd">        pattern (str | ProxyPattern): Template with allowed field tokens.</span>
 </span><span id="__span-0-285"><a id="__codelineno-0-285" name="__codelineno-0-285"></a>
-</span><span id="__span-0-286"><a id="__codelineno-0-286" name="__codelineno-0-286"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-287"><a id="__codelineno-0-287" name="__codelineno-0-287"></a><span class="sd">        &gt;&gt;&gt; from omniproxy.utils import OmniproxyParser, get_formatted_proxy_string</span>
-</span><span id="__span-0-288"><a id="__codelineno-0-288" name="__codelineno-0-288"></a><span class="sd">        &gt;&gt;&gt; p = OmniproxyParser.from_string(&quot;http://a:b@1.1.1.1:8080&quot;)</span>
-</span><span id="__span-0-289"><a id="__codelineno-0-289" name="__codelineno-0-289"></a><span class="sd">        &gt;&gt;&gt; get_formatted_proxy_string(p, &quot;ip:port&quot;)</span>
-</span><span id="__span-0-290"><a id="__codelineno-0-290" name="__codelineno-0-290"></a><span class="sd">        &#39;1.1.1.1:8080&#39;</span>
-</span><span id="__span-0-291"><a id="__codelineno-0-291" name="__codelineno-0-291"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-292"><a id="__codelineno-0-292" name="__codelineno-0-292"></a>
-</span><span id="__span-0-293"><a id="__codelineno-0-293" name="__codelineno-0-293"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="n">OmniproxyParser</span><span class="p">):</span>
-</span><span id="__span-0-294"><a id="__codelineno-0-294" name="__codelineno-0-294"></a>        <span class="n">dumped</span> <span class="o">=</span> <span class="n">msgspec</span><span class="o">.</span><span class="n">structs</span><span class="o">.</span><span class="n">asdict</span><span class="p">(</span><span class="n">proxy</span><span class="p">)</span>
-</span><span id="__span-0-295"><a id="__codelineno-0-295" name="__codelineno-0-295"></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-296"><a id="__codelineno-0-296" name="__codelineno-0-296"></a>        <span class="c1"># Assuming proxy is a type where these properties exist</span>
-</span><span id="__span-0-297"><a id="__codelineno-0-297" name="__codelineno-0-297"></a>        <span class="n">dumped</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-0-298"><a id="__codelineno-0-298" name="__codelineno-0-298"></a>            <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">protocol</span><span class="p">,</span>
-</span><span id="__span-0-299"><a id="__codelineno-0-299" name="__codelineno-0-299"></a>            <span class="s2">&quot;ip&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span>
-</span><span id="__span-0-300"><a id="__codelineno-0-300" name="__codelineno-0-300"></a>            <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
-</span><span id="__span-0-301"><a id="__codelineno-0-301" name="__codelineno-0-301"></a>            <span class="s2">&quot;username&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">username</span><span class="p">,</span>
-</span><span id="__span-0-302"><a id="__codelineno-0-302" name="__codelineno-0-302"></a>            <span class="s2">&quot;password&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">password</span><span class="p">,</span>
-</span><span id="__span-0-303"><a id="__codelineno-0-303" name="__codelineno-0-303"></a>            <span class="s2">&quot;rotation_url&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">rotation_url</span><span class="p">,</span>
-</span><span id="__span-0-304"><a id="__codelineno-0-304" name="__codelineno-0-304"></a>        <span class="p">}</span>
-</span><span id="__span-0-305"><a id="__codelineno-0-305" name="__codelineno-0-305"></a>
-</span><span id="__span-0-306"><a id="__codelineno-0-306" name="__codelineno-0-306"></a>    <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
-</span><span id="__span-0-307"><a id="__codelineno-0-307" name="__codelineno-0-307"></a>
-</span><span id="__span-0-308"><a id="__codelineno-0-308" name="__codelineno-0-308"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rotation_url&quot;</span><span class="p">):</span>
-</span><span id="__span-0-309"><a id="__codelineno-0-309" name="__codelineno-0-309"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_BRACKETS_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-286"><a id="__codelineno-0-286" name="__codelineno-0-286"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-287"><a id="__codelineno-0-287" name="__codelineno-0-287"></a><span class="sd">        str: Formatted proxy string.</span>
+</span><span id="__span-0-288"><a id="__codelineno-0-288" name="__codelineno-0-288"></a>
+</span><span id="__span-0-289"><a id="__codelineno-0-289" name="__codelineno-0-289"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-290"><a id="__codelineno-0-290" name="__codelineno-0-290"></a><span class="sd">        &gt;&gt;&gt; from omniproxy.utils import OmniproxyParser, get_formatted_proxy_string</span>
+</span><span id="__span-0-291"><a id="__codelineno-0-291" name="__codelineno-0-291"></a><span class="sd">        &gt;&gt;&gt; p = OmniproxyParser.from_string(&quot;http://a:b@1.1.1.1:8080&quot;)</span>
+</span><span id="__span-0-292"><a id="__codelineno-0-292" name="__codelineno-0-292"></a><span class="sd">        &gt;&gt;&gt; get_formatted_proxy_string(p, &quot;ip:port&quot;)</span>
+</span><span id="__span-0-293"><a id="__codelineno-0-293" name="__codelineno-0-293"></a><span class="sd">        &#39;1.1.1.1:8080&#39;</span>
+</span><span id="__span-0-294"><a id="__codelineno-0-294" name="__codelineno-0-294"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-295"><a id="__codelineno-0-295" name="__codelineno-0-295"></a>
+</span><span id="__span-0-296"><a id="__codelineno-0-296" name="__codelineno-0-296"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="n">OmniproxyParser</span><span class="p">):</span>
+</span><span id="__span-0-297"><a id="__codelineno-0-297" name="__codelineno-0-297"></a>        <span class="n">dumped</span> <span class="o">=</span> <span class="n">msgspec</span><span class="o">.</span><span class="n">structs</span><span class="o">.</span><span class="n">asdict</span><span class="p">(</span><span class="n">proxy</span><span class="p">)</span>
+</span><span id="__span-0-298"><a id="__codelineno-0-298" name="__codelineno-0-298"></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-0-299"><a id="__codelineno-0-299" name="__codelineno-0-299"></a>        <span class="c1"># Assuming proxy is a type where these properties exist</span>
+</span><span id="__span-0-300"><a id="__codelineno-0-300" name="__codelineno-0-300"></a>        <span class="n">dumped</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-301"><a id="__codelineno-0-301" name="__codelineno-0-301"></a>            <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">protocol</span><span class="p">,</span>
+</span><span id="__span-0-302"><a id="__codelineno-0-302" name="__codelineno-0-302"></a>            <span class="s2">&quot;ip&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">ip</span><span class="p">,</span>
+</span><span id="__span-0-303"><a id="__codelineno-0-303" name="__codelineno-0-303"></a>            <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+</span><span id="__span-0-304"><a id="__codelineno-0-304" name="__codelineno-0-304"></a>            <span class="s2">&quot;username&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">username</span><span class="p">,</span>
+</span><span id="__span-0-305"><a id="__codelineno-0-305" name="__codelineno-0-305"></a>            <span class="s2">&quot;password&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">password</span><span class="p">,</span>
+</span><span id="__span-0-306"><a id="__codelineno-0-306" name="__codelineno-0-306"></a>            <span class="s2">&quot;rotation_url&quot;</span><span class="p">:</span> <span class="n">proxy</span><span class="o">.</span><span class="n">rotation_url</span><span class="p">,</span>
+</span><span id="__span-0-307"><a id="__codelineno-0-307" name="__codelineno-0-307"></a>        <span class="p">}</span>
+</span><span id="__span-0-308"><a id="__codelineno-0-308" name="__codelineno-0-308"></a>
+</span><span id="__span-0-309"><a id="__codelineno-0-309" name="__codelineno-0-309"></a>    <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
 </span><span id="__span-0-310"><a id="__codelineno-0-310" name="__codelineno-0-310"></a>
-</span><span id="__span-0-311"><a id="__codelineno-0-311" name="__codelineno-0-311"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;username&quot;</span><span class="p">):</span>
-</span><span id="__span-0-312"><a id="__codelineno-0-312" name="__codelineno-0-312"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_USERNAME_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
-</span><span id="__span-0-313"><a id="__codelineno-0-313" name="__codelineno-0-313"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_PASSWORD_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
-</span><span id="__span-0-314"><a id="__codelineno-0-314" name="__codelineno-0-314"></a>    <span class="k">elif</span> <span class="ow">not</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;password&quot;</span><span class="p">):</span>
-</span><span id="__span-0-315"><a id="__codelineno-0-315" name="__codelineno-0-315"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_PASSWORD_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
-</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>
-</span><span id="__span-0-317"><a id="__codelineno-0-317" name="__codelineno-0-317"></a>    <span class="n">s</span> <span class="o">=</span> <span class="n">_collapse_pattern_after_optional_fields</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
-</span><span id="__span-0-318"><a id="__codelineno-0-318" name="__codelineno-0-318"></a>
-</span><span id="__span-0-319"><a id="__codelineno-0-319" name="__codelineno-0-319"></a>    <span class="n">values</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-0-320"><a id="__codelineno-0-320" name="__codelineno-0-320"></a>
-</span><span id="__span-0-321"><a id="__codelineno-0-321" name="__codelineno-0-321"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_token_repl</span><span class="p">(</span><span class="n">m</span><span class="p">:</span> <span class="n">re</span><span class="o">.</span><span class="n">Match</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-0-322"><a id="__codelineno-0-322" name="__codelineno-0-322"></a>        <span class="n">t</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-0-323"><a id="__codelineno-0-323" name="__codelineno-0-323"></a>        <span class="n">val</span> <span class="o">=</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
-</span><span id="__span-0-324"><a id="__codelineno-0-324" name="__codelineno-0-324"></a>        <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
-</span><span id="__span-0-325"><a id="__codelineno-0-325" name="__codelineno-0-325"></a>        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span>
-</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a>
-</span><span id="__span-0-327"><a id="__codelineno-0-327" name="__codelineno-0-327"></a>    <span class="n">fmt</span> <span class="o">=</span> <span class="n">TOKENS_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">_token_repl</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
-</span><span id="__span-0-328"><a id="__codelineno-0-328" name="__codelineno-0-328"></a>    <span class="k">return</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">)</span>
+</span><span id="__span-0-311"><a id="__codelineno-0-311" name="__codelineno-0-311"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rotation_url&quot;</span><span class="p">):</span>
+</span><span id="__span-0-312"><a id="__codelineno-0-312" name="__codelineno-0-312"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_BRACKETS_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-313"><a id="__codelineno-0-313" name="__codelineno-0-313"></a>
+</span><span id="__span-0-314"><a id="__codelineno-0-314" name="__codelineno-0-314"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;username&quot;</span><span class="p">):</span>
+</span><span id="__span-0-315"><a id="__codelineno-0-315" name="__codelineno-0-315"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_USERNAME_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_PASSWORD_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-317"><a id="__codelineno-0-317" name="__codelineno-0-317"></a>    <span class="k">elif</span> <span class="ow">not</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;password&quot;</span><span class="p">):</span>
+</span><span id="__span-0-318"><a id="__codelineno-0-318" name="__codelineno-0-318"></a>        <span class="n">s</span> <span class="o">=</span> <span class="n">REMOVE_PASSWORD_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-319"><a id="__codelineno-0-319" name="__codelineno-0-319"></a>
+</span><span id="__span-0-320"><a id="__codelineno-0-320" name="__codelineno-0-320"></a>    <span class="n">s</span> <span class="o">=</span> <span class="n">_collapse_pattern_after_optional_fields</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-321"><a id="__codelineno-0-321" name="__codelineno-0-321"></a>
+</span><span id="__span-0-322"><a id="__codelineno-0-322" name="__codelineno-0-322"></a>    <span class="n">values</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-0-323"><a id="__codelineno-0-323" name="__codelineno-0-323"></a>
+</span><span id="__span-0-324"><a id="__codelineno-0-324" name="__codelineno-0-324"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_token_repl</span><span class="p">(</span><span class="n">m</span><span class="p">:</span> <span class="n">re</span><span class="o">.</span><span class="n">Match</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-0-325"><a id="__codelineno-0-325" name="__codelineno-0-325"></a>        <span class="n">t</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-326"><a id="__codelineno-0-326" name="__codelineno-0-326"></a>        <span class="n">val</span> <span class="o">=</span> <span class="n">dumped</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+</span><span id="__span-0-327"><a id="__codelineno-0-327" name="__codelineno-0-327"></a>        <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+</span><span id="__span-0-328"><a id="__codelineno-0-328" name="__codelineno-0-328"></a>        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span>
+</span><span id="__span-0-329"><a id="__codelineno-0-329" name="__codelineno-0-329"></a>
+</span><span id="__span-0-330"><a id="__codelineno-0-330" name="__codelineno-0-330"></a>    <span class="n">fmt</span> <span class="o">=</span> <span class="n">TOKENS_RE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">_token_repl</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+</span><span id="__span-0-331"><a id="__codelineno-0-331" name="__codelineno-0-331"></a>    <span class="k">return</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -13927,7 +13933,7 @@ get_formatted_proxy_string(p, "ip:port")
       
       
     
-    <a href="https://github.com/mfdi/omniproxy" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+    <a href="https://github.com/MFDI-hub/omniproxy" target="_blank" rel="noopener" title="github.com" class="md-social__link">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
     </a>
   

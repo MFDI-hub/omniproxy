@@ -2,50 +2,50 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://mfdi.github.io/omniproxy/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/api/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/cli/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/backends/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/checking/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/configuration/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/exports/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/io/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/overview/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/parser/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/pools/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
     <url>
          <loc>https://mfdi.github.io/omniproxy/reference/proxy/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-04-14</lastmod>
     </url>
 </urlset>
