@@ -6,8 +6,7 @@ import asyncio
 import contextlib
 from typing import Any
 
-from aiohttp import ClientTimeout, TCPConnector
-from aiohttp.client import ClientSession
+from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from ..constants import DEFAULT_BACKEND_TIMEOUT
 from ..proxy import Proxy
