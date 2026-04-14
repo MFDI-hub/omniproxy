@@ -28,6 +28,7 @@ classifiers = [
 dependencies = [
     "msgspec>=0.10",
     "orjson>=3.10",
+    "typing-extensions>=4.12.0",
 ]
 
 [project.optional-dependencies]
@@ -72,18 +73,17 @@ dev = [
     "pydantic>=2.10",
     "python-dotenv>=1.0.0",
     "pytest>=8.0",
-    "types-requests>=2.32",
-    "mypy>=1.8",
     "ruff>=0.4",
     "mkdocs-material>=9.7.6",
     "mkdocstrings[python]>=1.0.3",
+    "ty>=0.0.29",
 ]
 
 [project.urls]
-Homepage = "https://github.com/mfdi/omniproxy"
+Homepage = "https://github.com/MFDI-hub/omniproxy"
 Documentation = "https://mfdi.github.io/omniproxy/"
-Repository = "https://github.com/mfdi/omniproxy"
-Issues = "https://github.com/mfdi/omniproxy/issues"
+Repository = "https://github.com/MFDI-hub/omniproxy"
+Issues = "https://github.com/MFDI-hub/omniproxy/issues"
 
 [project.scripts]
 omniproxy = "omniproxy.cli:main"
@@ -134,19 +134,24 @@ indent-style = "space"
 docstring-code-format = true
 
 # =========================
-# MYPY (STRICT)
+# TY (Astral type checker)
+# https://docs.astral.sh/ty/
 # =========================
-[tool.mypy]
-python_version = "3.10"
+[tool.ty.environment]
+python-version = "3.10"
 
-pretty = true
-show_error_codes = true
+[tool.ty.src]
+include = ["omniproxy"]
 
-ignore_missing_imports = true
-
-check_untyped_defs = true
-warn_unused_ignores = true
-warn_unused_configs = true
+[tool.ty.analysis]
+allowed-unresolved-imports = [
+    "aiohttp",
+    "aiohttp_socks",
+    "curl_cffi",
+    "tls_client",
+    "python_socks",
+    "requests",
+]
 
 # =========================
 # PYTEST

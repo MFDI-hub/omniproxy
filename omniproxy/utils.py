@@ -4,7 +4,7 @@ import ipaddress
 import re
 import urllib.parse
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 import msgspec
 
@@ -237,8 +237,11 @@ class OmniproxyParser(msgspec.Struct):
         assert _ip is not None and _port is not None, (
             "regex match must capture 'ip' and 'port' groups"
         )
+        _proto: Literal["http", "https", "socks5", "socks4"] = cast(
+            Literal["http", "https", "socks5", "socks4"], raw_proto
+        )
         return cls(
-            protocol=raw_proto,  # type: ignore[arg-type]
+            protocol=_proto,
             ip=_ip,
             port=int(_port),
             username=groups.get("username"),

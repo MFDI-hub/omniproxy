@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
+
+from typing_extensions import Self
 
 import msgspec
 import orjson
@@ -161,8 +163,8 @@ class Proxy(str):
         "username",
     )
 
-    # Explicit annotations are required for mypy to recognise __slots__ as instance attributes.
-    # Without them mypy reports '"Proxy" has no attribute "X"' for every slot access.
+    # Explicit annotations are required for static type checkers to treat __slots__ as instance attributes.
+    # Without them checkers report '"Proxy" has no attribute "X"' for every slot access.
     protocol: str
     ip: str
     port: int
@@ -184,7 +186,7 @@ class Proxy(str):
     # Frozen at class body: structural + metadata names guarded by __setattr__
     _protected_attributes: frozenset[str] = frozenset(_structural_attributes + _metadata_attributes)
 
-    def __new__(cls, proxy: str | Proxy, /, protocol: str | None = None) -> Proxy:
+    def __new__(cls, proxy: str | Proxy, /, protocol: str | None = None) -> Self:
         """Create a :class:`Proxy` from a string or existing instance, optionally changing protocol.
 
         Args:
@@ -204,7 +206,7 @@ class Proxy(str):
         # 1. FAST PATH
         if isinstance(proxy, Proxy):
             if protocol is None or protocol.lower() == (proxy.protocol or "").lower():
-                return proxy
+                return cast(Self, proxy)
 
             dumped_data = proxy.to_dict()
             p = protocol.lower()

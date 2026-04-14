@@ -29,10 +29,10 @@ jobs:
           python-version: "3.10"
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --group dev --group httpx
 
       - name: Ruff check
         run: uv run ruff check omniproxy tests
 
-      - name: Mypy
-        run: uv run mypy omniproxy
+      - name: ty
+        run: uv run ty check

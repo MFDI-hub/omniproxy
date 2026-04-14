@@ -164,7 +164,7 @@ Full flag reference: [CLI](cli.md).
 | Console `omniproxy` command | [CLI](cli.md) |
 | Docstrings and signatures | [API Reference](api.md) |
 
-The repository also keeps a dense reviewer checklist in [`FEATURES.md`](https://github.com/mfdi/omniproxy/blob/main/FEATURES.md) at the project root; the **Reference** section above is the narrative counterpart for the docs site.
+The repository also keeps a dense reviewer checklist in [`FEATURES.md`](https://github.com/MFDI-hub/omniproxy/blob/main/FEATURES.md) at the project root; the **Reference** section above is the narrative counterpart for the docs site.
 
 ---
 
@@ -172,7 +172,7 @@ The repository also keeps a dense reviewer checklist in [`FEATURES.md`](https://
 
 ```bash
 uv run ruff check omniproxy tests
-uv run mypy omniproxy
+uv run ty check
 uv run pytest
 uv build
 ```

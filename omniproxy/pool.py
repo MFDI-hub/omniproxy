@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from .config import LifecycleHooks, LimitsConfig, PoolConfig, Strategy
 from .constants import ANONYMITY_RANKS
@@ -598,7 +598,9 @@ class BaseProxyPool(ABC):
 
     def __contains__(self, item: object) -> bool:
         try:
-            key = self._key(Proxy(item) if not isinstance(item, Proxy) else item)  # type: ignore[arg-type]
+            key = self._key(
+                Proxy(cast(Proxy | str, item)) if not isinstance(item, Proxy) else item
+            )
         except (TypeError, ValueError):
             return False
         with self._lock:

@@ -48,4 +48,4 @@ User-facing behavior is implemented across:
 - `omniproxy/errors.py` — pool and filter exceptions
 - `omniproxy/cli.py` — `omniproxy` console entrypoint
 
-When the public API or defaults change, update these narrative pages and the root [FEATURES.md](https://github.com/mfdi/omniproxy/blob/main/FEATURES.md) (or its successor) in lockstep.
+When the public API or defaults change, update these narrative pages and the root [FEATURES.md](https://github.com/MFDI-hub/omniproxy/blob/main/FEATURES.md) (or its successor) in lockstep.

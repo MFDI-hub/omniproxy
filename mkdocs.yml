@@ -3,8 +3,8 @@ site_description: >-
   Use a proxy as a string, but achieve broad functionality for parsing, checking,
   pooling, and automation.
 site_url: https://mfdi.github.io/omniproxy/
-repo_url: https://github.com/mfdi/omniproxy
-repo_name: mfdi/omniproxy
+repo_url: https://github.com/MFDI-hub/omniproxy
+repo_name: MFDI-hub/omniproxy
 edit_uri: edit/main/docs/
 
 theme:
@@ -94,4 +94,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/mfdi/omniproxy
+      link: https://github.com/MFDI-hub/omniproxy

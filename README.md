@@ -1,6 +1,6 @@
 # omniproxy
 
-[![CI](https://img.shields.io/github/actions/workflow/status/mfdi/omniproxy/ci.yml?branch=main&logo=github&label=CI)](https://github.com/mfdi/omniproxy/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/MFDI-hub/omniproxy/ci.yml?branch=main&logo=github&label=CI)](https://github.com/MFDI-hub/omniproxy/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/omniproxy)](https://pypi.org/project/omniproxy/)
 [![Python versions](https://img.shields.io/pypi/pyversions/omniproxy)](https://pypi.org/project/omniproxy/)
 [![Documentation](https://img.shields.io/badge/docs-mfdi.github.io-526fff?logo=materialformkdocs&logoColor=white)](https://mfdi.github.io/omniproxy/)
@@ -180,7 +180,7 @@ omniproxy/
 ├── docs/                   # MkDocs site source
 ├── examples/               # Runnable examples
 ├── scripts/
-├── .github/workflows/      # CI (ruff, mypy), docs deploy
+├── .github/workflows/      # CI (ruff, ty), docs deploy
 ├── mkdocs.yml
 ├── pyproject.toml
 ├── uv.lock
@@ -196,7 +196,7 @@ omniproxy/
 1. **Fork** the repository and create a **feature branch** from `main`.
 2. Make your changes; keep commits focused and messages clear.
 3. **Style:** this repo uses **[Ruff](https://docs.astral.sh/ruff/)** for linting (and formatting where configured). Run `uv run ruff check omniproxy tests` before opening a PR.
-4. **Types:** run `uv run mypy omniproxy` when you touch typing-sensitive code.
+4. **Types:** run `uv run ty check` when you touch typing-sensitive code ([ty](https://docs.astral.sh/ty/) reads `[tool.ty]` in `pyproject.toml`).
 5. **Tests:** run `uv run pytest` locally; fix failures and avoid regressions.
 6. Open a **pull request** against `main` with a short description of the change and any trade-offs.
 
@@ -206,7 +206,7 @@ omniproxy/
 
 There is no root `CHANGELOG.md` yet. **Release history** and tags are tracked on GitHub:
 
-**[https://github.com/mfdi/omniproxy/releases](https://github.com/mfdi/omniproxy/releases)**
+**[https://github.com/MFDI-hub/omniproxy/releases](https://github.com/MFDI-hub/omniproxy/releases)**
 
 For semantic versioning, follow the version in `omniproxy/__init__.py` and PyPI.
 
@@ -217,7 +217,7 @@ For semantic versioning, follow the version in `omniproxy/__init__.py` and PyPI.
 ```bash
 uv sync --group dev --group httpx   # or rely on [tool.uv] default-groups
 uv run ruff check omniproxy tests
-uv run mypy omniproxy
+uv run ty check
 uv run pytest
 uv build
 ```
