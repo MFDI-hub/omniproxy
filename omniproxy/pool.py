@@ -1,4 +1,4 @@
-"""Managed proxy groups with rotation and cooldown blacklisting."""
+"""Managed proxy groups with rotation, cooldown blacklisting, scoring, circuit breaker, and sessions (v2.1)."""
 
 from __future__ import annotations
 
@@ -14,21 +14,236 @@ import weakref
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
 
-from .config import LifecycleHooks, LimitsConfig, PoolConfig, Strategy
+from .config import (
+    CircuitBreakerConfig,
+    LifecycleHooks,
+    LimitsConfig,
+    PoolConfig,
+    ScoringConfig,
+    Strategy,
+)
 from .constants import ANONYMITY_RANKS
+from .enum import (
+    CircuitBreakerState,
+    FilterMissingMetadata,
+    PoolStrategy,
+    PoolStructure,
+    SessionCooldownPolicy,
+)
 from .errors import (
     MissingProxyMetadata,
     NoMatchingProxy,
+    PoolCircuitOpenError,
     PoolClosedError,
     PoolExhausted,
     PoolSaturated,
+    SessionBrokenError,
 )
 from .extended_proxy import Proxy, arun_health_check
 
 _LOG = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Scoring, circuit breaker, sticky sessions (v2.1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class ProxyScore:
+    """Rolling success/latency aggregates for one proxy URL key."""
+
+    proxy: Proxy
+    successes: int = 0
+    failures: int = 0
+    _latency_samples: list[tuple[float, float]] = field(default_factory=list)  # (monotonic_ts, latency_s)
+    last_update: float = 0.0
+    _score: float = 0.5
+    _score_dirty: bool = True
+    _avg_dirty: bool = True
+    _cached_avg_latency: float | None = None
+    _cached_score_valid: bool = False  # avoids treating 0.0 score as falsy vs cache miss
+
+    def update(self, config: ScoringConfig, success: bool, latency: float | None) -> None:
+        now = time.monotonic()
+        if success:
+            self.successes += 1
+        else:
+            self.failures += 1
+        if latency is not None:
+            self._latency_samples.append((now, float(latency)))
+        cutoff = now - config.window_seconds
+        self._latency_samples = [x for x in self._latency_samples if x[0] >= cutoff]
+        self.last_update = now
+        self._score_dirty = True
+        self._avg_dirty = True
+        self._cached_score_valid = False
+
+    def _flush_avg_latency_cache_if_dirty(self) -> None:
+        if not self._avg_dirty:
+            return
+        if not self._latency_samples:
+            self._cached_avg_latency = None
+        else:
+            self._cached_avg_latency = sum(x[1] for x in self._latency_samples) / len(
+                self._latency_samples
+            )
+        self._avg_dirty = False
+
+    def compute_score(self, config: ScoringConfig, pool_avg_latency: float) -> float:
+        if not self._score_dirty and self._cached_score_valid:
+            return self._score
+        total = self.successes + self.failures
+        if total < config.min_samples:
+            self._flush_avg_latency_cache_if_dirty()
+            self._cached_score_valid = True
+            self._score_dirty = False
+            return self._score
+        suc_rate = self.successes / total if total > 0 else 0.0
+        avg = self.avg_latency()
+        if avg is not None:
+            if pool_avg_latency > 0:
+                latency_score = max(0.0, min(1.0, 1.0 - (avg / (pool_avg_latency * 2))))
+            else:
+                latency_score = 1.0
+        else:
+            latency_score = 0.5
+        score = config.success_weight * suc_rate + config.latency_weight * latency_score
+        self._score = score
+        self._score_dirty = False
+        self._cached_score_valid = True
+        return score
+
+    def avg_latency(self) -> float | None:
+        self._flush_avg_latency_cache_if_dirty()
+        return self._cached_avg_latency
+
+
+class CircuitBreaker:
+    """Pool-level breaker: CLOSED counts outcomes; OPEN blocks; HALF_OPEN admits one trial."""
+
+    def __init__(self, config: CircuitBreakerConfig, hooks: LifecycleHooks | None) -> None:
+        self.config = config
+        self._hooks = hooks
+        self.state: CircuitBreakerState = CircuitBreakerState.CLOSED
+        self.failures = 0
+        self.successes = 0
+        self.last_state_change = time.monotonic()
+        self._lock = threading.Lock()
+
+    def reset(self) -> None:
+        with self._lock:
+            self.state = CircuitBreakerState.CLOSED
+            self.failures = 0
+            self.successes = 0
+            self.last_state_change = time.monotonic()
+
+    def allow_request(self) -> bool:
+        with self._lock:
+            now = time.monotonic()
+            if self.state == CircuitBreakerState.OPEN and (now - self.last_state_change) >= self.config.half_open_timeout:
+                self.state = CircuitBreakerState.HALF_OPEN
+                self.last_state_change = now
+                self.successes = 0
+                self.failures = 0
+            return self.state != CircuitBreakerState.OPEN
+
+    def record(self, success: bool) -> None:
+        with self._lock:
+            if self.state == CircuitBreakerState.HALF_OPEN:
+                if success:
+                    self.state = CircuitBreakerState.CLOSED
+                    self.last_state_change = time.monotonic()
+                    self.successes = 0
+                    self.failures = 0
+                    if self._hooks and self._hooks.on_circuit_close:
+                        self._hooks.on_circuit_close()
+                else:
+                    self.state = CircuitBreakerState.OPEN
+                    self.last_state_change = time.monotonic()
+                    self.successes = 0
+                    self.failures = 0
+                    if self._hooks and self._hooks.on_circuit_open:
+                        self._hooks.on_circuit_open()
+                return
+            if self.state == CircuitBreakerState.OPEN:
+                return
+            # CLOSED
+            if success:
+                self.successes += 1
+            else:
+                self.failures += 1
+            total = self.successes + self.failures
+            if total < self.config.min_throughput:
+                return
+            ratio = self.failures / total if total > 0 else 0.0
+            if ratio >= self.config.failure_ratio:
+                self.state = CircuitBreakerState.OPEN
+                self.last_state_change = time.monotonic()
+                self.successes = 0
+                self.failures = 0
+                if self._hooks and self._hooks.on_circuit_open:
+                    self._hooks.on_circuit_open()
+
+
+class SessionStore:
+    """Sticky session_id → proxy with sliding TTL (monotonic expiry)."""
+
+    def __init__(self, ttl: float) -> None:
+        self._sessions: dict[str, tuple[Proxy, float]] = {}
+        self._lock = threading.Lock()
+        self._ttl = ttl
+
+    def reset(self) -> None:
+        with self._lock:
+            self._sessions.clear()
+
+    def get(self, session_id: str) -> Proxy | None:
+        with self._lock:
+            entry = self._sessions.get(session_id)
+            if not entry:
+                return None
+            proxy, expire = entry
+            if time.monotonic() < expire:
+                self._sessions[session_id] = (proxy, time.monotonic() + self._ttl)
+                return proxy
+            del self._sessions[session_id]
+            return None
+
+    def bind(self, session_id: str, proxy: Proxy) -> None:
+        with self._lock:
+            self._sessions[session_id] = (proxy, time.monotonic() + self._ttl)
+
+    def peek_binding(self, session_id: str) -> Proxy | None:
+        """Return the bound proxy if *session_id* exists and TTL has not expired.
+
+        Unlike :meth:`get`, this does not extend the TTL. Expired entries are removed.
+        """
+        with self._lock:
+            entry = self._sessions.get(session_id)
+            if not entry:
+                return None
+            proxy, expire = entry
+            now = time.monotonic()
+            if now < expire:
+                return proxy
+            del self._sessions[session_id]
+            return None
+
+    def unbind(self, session_id: str) -> Proxy | None:
+        with self._lock:
+            entry = self._sessions.pop(session_id, None)
+            return entry[0] if entry else None
+
+
+_RESERVED_POOL_KWARGS = frozenset({"session_id"})
+
+
+def _acquire_filter_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in kwargs.items() if k not in _RESERVED_POOL_KWARGS}
 
 
 @runtime_checkable
@@ -41,7 +256,7 @@ class BasePoolProtocol(Protocol):
     @property
     def config(self) -> PoolConfig: ...
 
-    def mark_success(self, proxy: Proxy | str) -> None: ...
+    def mark_success(self, proxy: Proxy | str, *, latency: float | None = None) -> None: ...
     def mark_failed(self, proxy: Proxy | str, exc_type: type | None = None) -> None: ...
 
 
@@ -118,12 +333,21 @@ class _PoolState:
 
     __slots__ = (
         "_active_keys",
+        "_ada_cooldown_fn",
+        "_circuit_breaker",
         "_cooldown_until",
+        "_dead_letter",
         "_failure_counts",
         "_index",
         "_index_cache",
         "_index_dirty",
+        "_pool_avg_latency_count",
+        "_pool_avg_latency_dirty",
+        "_pool_avg_latency_sum",
         "_prototypes",
+        "_scores",
+        "_scoring_config",
+        "_session_store",
         "_success_counts",
         "_token_buckets",
         "config",
@@ -134,7 +358,7 @@ class _PoolState:
         self.config = config
         self._prototypes = prototypes
         self.proxies: list[Proxy] | deque[Proxy] = (
-            deque(prototypes) if config.structure == "deque" else list(prototypes)
+            deque(prototypes) if config.structure == PoolStructure.DEQUE else list(prototypes)
         )
         self._active_keys: set[str] = {self._nolock_key(p) for p in self.proxies}
         self._index = 0
@@ -145,9 +369,115 @@ class _PoolState:
         self._index_dirty = False
         self._token_buckets: dict[str, TokenBucket] | None = None
 
+        self._scores: dict[str, ProxyScore] = {}
+        self._dead_letter: list[Proxy] = []
+        self._scoring_config = config.scoring
+        self._circuit_breaker = (
+            CircuitBreaker(config.circuit_breaker, config.hooks)
+            if config.circuit_breaker is not None
+            else None
+        )
+        self._session_store = (
+            SessionStore(config.session_ttl) if config.session_ttl > 0 else None
+        )
+
+        if config.cooldown_strategy is not None:
+            self._ada_cooldown_fn = config.cooldown_strategy
+        elif config.adaptive_cooldown:
+            self._ada_cooldown_fn = self._default_adaptive_cooldown
+        else:
+            self._ada_cooldown_fn = None
+
+        self._pool_avg_latency_sum: float = 0.0
+        self._pool_avg_latency_count: int = 0
+        self._pool_avg_latency_dirty: bool = True
+
+    def _nolock_key(self, p: Proxy, *, precomputed: str | None = None) -> str:
+        if precomputed is not None:
+            return precomputed
+        fn = self.config.dedup_key
+        return fn(p) if fn is not None else p._url
+
     @staticmethod
-    def _nolock_key(p: Proxy) -> str:
-        return p.url
+    def _default_adaptive_cooldown(base: float, active: int, total: int) -> float:
+        ratio = active / max(total, 1)
+        if ratio >= 0.8:
+            mult = 1.5
+        elif ratio >= 0.5:
+            mult = 1.0
+        elif ratio >= 0.2:
+            mult = 0.7
+        else:
+            mult = 0.4
+        return base * mult
+
+    def _nolock_calc_cooldown(self, exc_type: type | None = None) -> float:
+        base = float(self.config.cooldown)
+        if self._ada_cooldown_fn is not None:
+            active = len(self._active_keys)
+            total = len(self._prototypes)
+            base = float(self._ada_cooldown_fn(base, active, total))
+        penalty = (
+            self.config.failure_penalties.get(exc_type, 1.0) if exc_type is not None else 1.0
+        )
+        final = base * float(penalty)
+        return max(self.config.min_cooldown, min(self.config.max_cooldown, final))
+
+    def _nolock_pool_avg_latency(self) -> float:
+        if self._pool_avg_latency_dirty:
+            total = 0.0
+            count = 0
+            for s in self._scores.values():
+                a = s.avg_latency()
+                if a is not None:
+                    total += a
+                    count += 1
+            self._pool_avg_latency_sum = total
+            self._pool_avg_latency_count = count
+            self._pool_avg_latency_dirty = False
+        if self._pool_avg_latency_count == 0:
+            return 0.0
+        return self._pool_avg_latency_sum / self._pool_avg_latency_count
+
+    def _nolock_invalidate_pool_avg_latency_cache(self) -> None:
+        self._pool_avg_latency_dirty = True
+
+    def _nolock_evict_if_needed(self) -> None:
+        cfg = self._scoring_config
+        if cfg is None:
+            return
+        now = time.monotonic()
+        for k, score_obj in list(self._scores.items()):
+            if k not in self._active_keys:
+                continue
+            if score_obj.last_update <= 0:
+                continue
+            grace = cfg.eviction_grace_period
+            if grace > 0 and (now - score_obj.last_update) < grace:
+                continue
+            avg_lat = self._nolock_pool_avg_latency()
+            s = score_obj.compute_score(cfg, avg_lat)
+            if s >= cfg.eviction_threshold:
+                continue
+            proxy = next((p for p in self._prototypes if self._nolock_key(p) == k), None)
+            if proxy is None:
+                continue
+            self._active_keys.discard(k)
+            if isinstance(self.proxies, list):
+                self.proxies[:] = [p for p in self.proxies if self._nolock_key(p) != k]
+                self._nolock_normalize_index()
+            else:
+                kept = [x for x in self.proxies if self._nolock_key(x) != k]
+                self.proxies.clear()
+                self.proxies.extend(kept)
+            self._dead_letter.append(proxy)
+            if len(self._dead_letter) > self.config.dead_letter_max_size:
+                self._dead_letter[:] = self._dead_letter[-self.config.dead_letter_max_size :]
+            self._index_dirty = True
+            if hook := self.config.hooks.on_auto_evicted:
+                hook(proxy, "Score below threshold")
+            del self._scores[k]
+            self._nolock_invalidate_pool_avg_latency_cache()
 
     def _nolock_shortest_active_cooldown(self, now: float) -> float | None:
         """Seconds until the next cooldown expiry; *now* is :func:`time.monotonic`."""
@@ -169,8 +499,11 @@ class _PoolState:
         for k, until in list(self._cooldown_until.items()):
             if until <= now:
                 del self._cooldown_until[k]
+        dead_keys = {self._nolock_key(p) for p in self._dead_letter}
         for p in self._prototypes:
             k = self._nolock_key(p)
+            if k in dead_keys:
+                continue
             if k not in self._cooldown_until and k not in self._active_keys:
                 self.proxies.append(p)
                 self._active_keys.add(k)
@@ -184,7 +517,8 @@ class _PoolState:
 
     @staticmethod
     def _nolock_filter_cache_key(kwargs: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
-        return tuple(sorted(kwargs.items()))
+        filtered = _acquire_filter_kwargs(kwargs)
+        return tuple(sorted(filtered.items()))
 
     @staticmethod
     def _nolock_min_anonymity_rank(label: str) -> int:
@@ -202,18 +536,18 @@ class _PoolState:
                 need = self._nolock_min_anonymity_rank(str(value))
                 raw = proxy.anonymity
                 if raw is None:
-                    if fm == "skip":
+                    if fm == FilterMissingMetadata.SKIP:
                         return False
-                    if fm == "raise":
+                    if fm == FilterMissingMetadata.RAISE:
                         raise MissingProxyMetadata(
                             f"Proxy {proxy.safe_url!r} has no anonymity metadata for min_anonymity filter"
                         )
                     continue
                 pr = ANONYMITY_RANKS.get(str(raw).lower())
                 if pr is None:
-                    if fm == "skip":
+                    if fm == FilterMissingMetadata.SKIP:
                         return False
-                    if fm == "raise":
+                    if fm == FilterMissingMetadata.RAISE:
                         raise MissingProxyMetadata(
                             f"Proxy {proxy.safe_url!r} has unknown anonymity {raw!r}"
                         )
@@ -223,9 +557,9 @@ class _PoolState:
                 continue
             actual = getattr(proxy, key, None)
             if actual is None:
-                if fm == "skip":
+                if fm == FilterMissingMetadata.SKIP:
                     return False
-                if fm == "raise":
+                if fm == FilterMissingMetadata.RAISE:
                     raise MissingProxyMetadata(
                         f"Proxy {proxy.safe_url!r} has no value for attribute {key!r}"
                     )
@@ -244,14 +578,83 @@ class _PoolState:
         self, subset: list[Proxy], pool_ordered: list[Proxy]
     ) -> list[Proxy]:
         subset_keys = {self._nolock_key(p) for p in subset}
-        candidates = [p for p in pool_ordered if self._nolock_key(p) in subset_keys]
-        if self.config.strategy == "random":
-            return random.sample(candidates, len(candidates))
-        nc = len(candidates)
-        if nc == 0:
+        candidates: list[tuple[str, Proxy]] = []
+        for p in pool_ordered:
+            k = self._nolock_key(p)
+            if k in subset_keys:
+                candidates.append((k, p))
+
+        if not candidates:
             return []
+
+        strategy = self.config.strategy
+        if strategy == PoolStrategy.RANDOM:
+            random.shuffle(candidates)
+            return [p for _, p in candidates]
+
+        if strategy == PoolStrategy.WEIGHTED:
+            if self._scoring_config is None:
+                return [p for _, p in candidates]
+            avg_lat = self._nolock_pool_avg_latency()
+            scored: list[tuple[float, str, Proxy]] = []
+            for k, p in candidates:
+                score_obj = self._scores.get(k)
+                s = (
+                    score_obj.compute_score(self._scoring_config, avg_lat)
+                    if score_obj is not None
+                    else 0.5
+                )
+                scored.append((s, k, p))
+            scored.sort(key=lambda x: (-x[0], x[1]))
+            ordered = [p for _, _, p in scored]
+            nc = len(ordered)
+            start = self._index % nc
+            return ordered[start:] + ordered[:start]
+
+        if strategy == PoolStrategy.LOWEST_LATENCY:
+            lat_ranked: list[tuple[float, str, Proxy]] = []
+            for k, p in candidates:
+                score_obj = self._scores.get(k)
+                if score_obj is None:
+                    lat_v = float("inf")
+                else:
+                    av = score_obj.avg_latency()
+                    lat_v = float("inf") if av is None else av
+                lat_ranked.append((lat_v, k, p))
+            lat_ranked.sort(key=lambda x: (x[0], x[1]))
+            ordered = [p for _, _, p in lat_ranked]
+            nc = len(ordered)
+            start = self._index % nc
+            return ordered[start:] + ordered[:start]
+
+        ordered_c = [p for _, p in candidates]
+        nc = len(ordered_c)
         start = self._index % nc
-        return candidates[start:] + candidates[:start]
+        return ordered_c[start:] + ordered_c[:start]
+
+    def _nolock_try_session_bind(
+        self,
+        session_id: str,
+        filter_kw: dict[str, Any],
+        active_connections: dict[str, int],
+    ) -> Proxy | None:
+        if self._session_store is None:
+            return None
+        bound = self._session_store.get(session_id)
+        if bound is None:
+            return None
+        k = self._nolock_key(bound)
+        if k not in self._active_keys or k in self._cooldown_until:
+            return None
+        if filter_kw and not self._nolock_proxy_passes_filters(bound, filter_kw):
+            return None
+        limit = self.config.limits.max_connections_per_proxy
+        if limit is not None and active_connections.get(k, 0) >= limit:
+            return None
+        if self.config.limits.max_rps_per_proxy is not None and not self._nolock_consume_token(k):
+            return None
+        active_connections[k] = active_connections.get(k, 0) + 1
+        return bound
 
     def _nolock_consume_token(self, k: str) -> bool:
         rps = self.config.limits.max_rps_per_proxy
@@ -279,21 +682,53 @@ class _PoolState:
         self, kwargs: dict[str, Any], active_connections: dict[str, int]
     ) -> Proxy:
         self._nolock_purge_cooldown()
+        self._nolock_evict_if_needed()
         if self._index_dirty:
             self._index_cache.clear()
             self._index_dirty = False
 
+        if self._circuit_breaker is not None and not self._circuit_breaker.allow_request():
+            raise PoolCircuitOpenError("Proxy pool circuit breaker is open")
+
+        filter_kw = _acquire_filter_kwargs(kwargs)
         cache_key = self._nolock_filter_cache_key(kwargs)
         if cache_key not in self._index_cache:
-            self._index_cache[cache_key] = self._nolock_filter_proxies_for_kwargs(kwargs)
+            self._index_cache[cache_key] = self._nolock_filter_proxies_for_kwargs(filter_kw)
         subset = self._index_cache[cache_key]
+
+        session_raw = kwargs.get("session_id")
+        session_id = session_raw if isinstance(session_raw, str) and session_raw else None
 
         active = self._nolock_snapshot_active_order()
         if not active:
+            if session_id and self._session_store is not None:
+                had_binding = self._session_store.peek_binding(session_id) is not None
+                if had_binding:
+                    pol = self.config.session_cooldown_policy
+                    if pol == SessionCooldownPolicy.RAISE:
+                        raise SessionBrokenError(f"No usable bound proxy for session {session_id!r}")
+                    if pol == SessionCooldownPolicy.BLOCK:
+                        raise PoolSaturated(
+                            "Sticky session proxy unavailable (session_cooldown_policy='block')"
+                        )
             raise PoolExhausted("No proxies available")
 
         if not subset:
             raise NoMatchingProxy("No proxy matches the requested filters")
+
+        if session_id and self._session_store is not None:
+            had_binding = self._session_store.peek_binding(session_id) is not None
+            p = self._nolock_try_session_bind(session_id, filter_kw, active_connections)
+            if p is not None:
+                return p
+            pol = self.config.session_cooldown_policy
+            if had_binding:
+                if pol == SessionCooldownPolicy.RAISE:
+                    raise SessionBrokenError(f"No usable bound proxy for session {session_id!r}")
+                if pol == SessionCooldownPolicy.BLOCK:
+                    raise PoolSaturated(
+                        "Sticky session proxy unavailable (session_cooldown_policy='block')"
+                    )
 
         ordered = self._nolock_ordered_candidates(subset, active)
         limit = self.config.limits.max_connections_per_proxy
@@ -315,8 +750,14 @@ class _PoolState:
                 continue
 
             active_connections[k] = active_connections.get(k, 0) + 1
-            if self.config.strategy == "round_robin" and nc:
+            if self.config.strategy in (
+                PoolStrategy.ROUND_ROBIN,
+                PoolStrategy.WEIGHTED,
+                PoolStrategy.LOWEST_LATENCY,
+            ) and nc:
                 self._index = (self._index + i + 1) % nc
+            if session_id and self._session_store is not None:
+                self._session_store.bind(session_id, p)
             return p
 
         if saturated:
@@ -344,10 +785,8 @@ class _PoolState:
         self._failure_counts[k] = count
         cooled = count >= self.config.failure_threshold
         if cooled:
-            penalty = (
-                self.config.failure_penalties.get(exc_type, 1.0) if exc_type is not None else 1.0
-            )
-            self._cooldown_until[k] = time.monotonic() + (self.config.cooldown * penalty)
+            cd = self._nolock_calc_cooldown(exc_type)
+            self._cooldown_until[k] = time.monotonic() + cd
             if isinstance(self.proxies, list):
                 self.proxies[:] = [x for x in self.proxies if self._nolock_key(x) != k]
                 self._nolock_normalize_index()
@@ -357,19 +796,33 @@ class _PoolState:
                 self.proxies.extend(kept)
             self._active_keys.discard(k)
         self._index_dirty = True
+        if self._scoring_config is not None:
+            score_obj = self._scores.get(k)
+            if score_obj is None:
+                score_obj = ProxyScore(p)
+            score_obj.update(self._scoring_config, success=False, latency=None)
+            self._scores[k] = score_obj
+            self._nolock_invalidate_pool_avg_latency_cache()
         return cooled, p
 
-    def _nolock_mark_success(self, p: Proxy) -> int:
+    def _nolock_mark_success(self, p: Proxy, latency: float | None = None) -> int:
         k = self._nolock_key(p)
         prev_failures = self._failure_counts.get(k, 0)
         self._success_counts[k] = self._success_counts.get(k, 0) + 1
         self._failure_counts.pop(k, None)
         self._index_dirty = True
+        if self._scoring_config is not None:
+            score_obj = self._scores.get(k)
+            if score_obj is None:
+                score_obj = ProxyScore(p)
+            score_obj.update(self._scoring_config, success=True, latency=latency)
+            self._scores[k] = score_obj
+            self._nolock_invalidate_pool_avg_latency_cache()
         return prev_failures
 
     def _nolock_reset(self) -> None:
         self.proxies = (
-            deque(self._prototypes) if self.config.structure == "deque" else list(self._prototypes)
+            deque(self._prototypes) if self.config.structure == PoolStructure.DEQUE else list(self._prototypes)
         )
         self._active_keys = {self._nolock_key(p) for p in self.proxies}
         self._cooldown_until.clear()
@@ -377,6 +830,16 @@ class _PoolState:
         self._success_counts.clear()
         self._index = 0
         self._index_dirty = True
+        self._scores.clear()
+        self._pool_avg_latency_sum = 0.0
+        self._pool_avg_latency_count = 0
+        self._pool_avg_latency_dirty = True
+        self._dead_letter.clear()
+        if self._session_store is not None:
+            self._session_store.reset()
+        if self._circuit_breaker is not None:
+            self._circuit_breaker.reset()
+        self._token_buckets = None
 
 
 class HealthMonitor:
@@ -415,8 +878,9 @@ class HealthMonitor:
                     active = list(pool)
                     cooling = list(pool.cooling_proxies)
                     ordered: dict[str, Proxy] = {}
+                    st = pool._state
                     for p in active + cooling:
-                        ordered[_PoolState._nolock_key(p)] = p
+                        ordered[st._nolock_key(p)] = p
                     proxies_to_check = list(ordered.values())
 
                     if proxies_to_check:
@@ -435,7 +899,7 @@ class HealthMonitor:
                                 continue
                             p, result = item
                             if result.success:
-                                pool.mark_success(p)
+                                pool.mark_success(p, latency=result.latency)
                             else:
                                 pool.mark_failed(p, result.exc_type)
                 except PoolClosedError:
@@ -499,12 +963,14 @@ class BaseProxyPool(ABC):
         if config is None:
             config = PoolConfig()
         if strategy is not None:
-            config.strategy = strategy
+            config.strategy = (
+                strategy if isinstance(strategy, PoolStrategy) else PoolStrategy(strategy)
+            )
         if cooldown is not None:
             config.cooldown = cooldown
 
-        if config.strategy == "random" and config.structure == "deque":
-            config.structure = "list"
+        if config.strategy == PoolStrategy.RANDOM and config.structure == PoolStructure.DEQUE:
+            config.structure = PoolStructure.LIST
 
         self.config: PoolConfig = config
 
@@ -553,9 +1019,8 @@ class BaseProxyPool(ABC):
     def _notify_async_condition(self, *, notify_all: bool = False) -> None:  # noqa: ARG002
         return None
 
-    @staticmethod
-    def _key(p: Proxy) -> str:
-        return _PoolState._nolock_key(p)
+    def _key(self, p: Proxy) -> str:
+        return self._state._nolock_key(p)
 
     @staticmethod
     def _filter_cache_key(kwargs: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
@@ -626,7 +1091,7 @@ class BaseProxyPool(ABC):
     def mark_failed(self, proxy: Proxy | str, exc_type: type | None = None) -> None: ...
 
     @abstractmethod
-    def mark_success(self, proxy: Proxy | str) -> None: ...
+    def mark_success(self, proxy: Proxy | str, *, latency: float | None = None) -> None: ...
 
     @abstractmethod
     def reset_pool(self) -> None: ...
@@ -773,18 +1238,22 @@ class SyncProxyPool(BaseProxyPool):
                 raise PoolClosedError("proxy pool is closed")
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             cooled, p = self._state._nolock_mark_failed(p, exc_type)
+            if self._state._circuit_breaker is not None:
+                self._state._circuit_breaker.record(False)
             self._notify_sync_condition(notify_all=cooled)
         if cb := self.config.hooks.on_proxy_failed:
             cb(p, exc_type)
         if cooled and (cb_cd := self.config.hooks.on_proxy_cooled_down):
             cb_cd(p)
 
-    def mark_success(self, proxy: Proxy | str) -> None:
+    def mark_success(self, proxy: Proxy | str, *, latency: float | None = None) -> None:
         with self._lock:
             if self._closed:
                 raise PoolClosedError("proxy pool is closed")
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
-            prev_failures = self._state._nolock_mark_success(p)
+            prev_failures = self._state._nolock_mark_success(p, latency=latency)
+            if self._state._circuit_breaker is not None:
+                self._state._circuit_breaker.record(True)
             self._notify_sync_condition(notify_all=False)
         if prev_failures > 0 and (cb := self.config.hooks.on_proxy_recovered):
             cb(p)
@@ -1005,7 +1474,8 @@ class AsyncProxyPool(BaseProxyPool):
         On Python 3.11+, wraps the whole ``async with cond`` body in :class:`asyncio.timeout` (not
         the reverse) so timeout cancellation runs ``cond``'s ``__aexit__`` and releases the lock
         cleanly. Notifies from :meth:`_notify_async_condition` still shorten the wait. On 3.10 and
-        below, uses :func:`asyncio.sleep` without holding ``cond`` (no early wake on notify).
+        below, ``asyncio.sleep`` runs **without** holding ``cond`` (no early wake on notify; avoids
+        deadlock from sleeping while holding the condition lock).
         """
         self._bind_async_consumer_loop()
         with self._lock:
@@ -1021,16 +1491,16 @@ class AsyncProxyPool(BaseProxyPool):
             wt = max(wt, 0.0)
         wait_timeout = wt if wt > 0 else 0.001
         cond = self._async_condition
-        async with cond:
-            timeout_cm = getattr(asyncio, "timeout", None)
-            if timeout_cm is not None:
+        timeout_cm = getattr(asyncio, "timeout", None)
+        if timeout_cm is not None:
+            async with cond:
                 try:
                     async with timeout_cm(wait_timeout):
                         await cond.wait()
                 except TimeoutError:
                     pass
-            else:
-                await asyncio.sleep(wait_timeout)
+        else:
+            await asyncio.sleep(wait_timeout)
         with self._lock:
             if self._closed:
                 raise PoolClosedError("proxy pool is closed")
@@ -1162,18 +1632,22 @@ class AsyncProxyPool(BaseProxyPool):
                 raise PoolClosedError("proxy pool is closed")
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
             cooled, p = self._state._nolock_mark_failed(p, exc_type)
+            if self._state._circuit_breaker is not None:
+                self._state._circuit_breaker.record(False)
         self._notify_async_condition(notify_all=cooled)
         if cb := self.config.hooks.on_proxy_failed:
             cb(p, exc_type)
         if cooled and (cb_cd := self.config.hooks.on_proxy_cooled_down):
             cb_cd(p)
 
-    def mark_success(self, proxy: Proxy | str) -> None:
+    def mark_success(self, proxy: Proxy | str, *, latency: float | None = None) -> None:
         with self._lock:
             if self._closed:
                 raise PoolClosedError("proxy pool is closed")
             p = Proxy(proxy) if not isinstance(proxy, Proxy) else proxy
-            prev_failures = self._state._nolock_mark_success(p)
+            prev_failures = self._state._nolock_mark_success(p, latency=latency)
+            if self._state._circuit_breaker is not None:
+                self._state._circuit_breaker.record(True)
         self._notify_async_condition(notify_all=False)
         if prev_failures > 0 and (cb := self.config.hooks.on_proxy_recovered):
             cb(p)
@@ -1264,12 +1738,15 @@ __all__ = [
     "AsyncProxyPool",
     "BasePoolProtocol",
     "BaseProxyPool",
+    "CircuitBreaker",
     "HealthMonitor",
     "LifecycleHooks",
     "LimitsConfig",
     "MonitorablePoolProtocol",
     "PoolConfig",
     "ProxyPool",
+    "ProxyScore",
+    "SessionStore",
     "SyncPoolProtocol",
     "SyncProxyPool",
     "TokenBucket",

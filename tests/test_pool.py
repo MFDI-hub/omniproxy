@@ -1,4 +1,4 @@
-"""``SyncProxyPool`` smoke tests using ``PROXIES`` from the environment (see ``tests/proxy_seeds``)."""
+"""``SyncProxyPool`` smoke tests using ``PROXY_LIST`` from the environment (see ``tests/proxy_seeds``)."""
 
 import unittest
 

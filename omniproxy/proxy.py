@@ -2,20 +2,29 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, TypedDict, cast
 
 import msgspec
 import orjson
 from typing_extensions import Self
 
 # from .adapter import _ExtraTypeConstructor
+from .config import settings
 from .constants import (
     DEFAULT_PROXY_PATTERN_STRING,
     PROXY_METADATA_FIELDS,
     PROXY_PATTERN_ALLOWED_WORDS,
     PROXY_STRUCTURAL_FIELDS,
 )
-from .utils import OmniproxyParser, get_formatted_proxy_string
+from .enum import HttpVerb, ProxyProtocol
+from .utils import (
+    REMOVE_PASSWORD_RE,
+    REMOVE_USERNAME_RE,
+    TOKENS_RE,
+    OmniproxyParser,
+    _collapse_pattern_after_optional_fields,
+    get_formatted_proxy_string,
+)
 
 
 class PlaywrightProxySettings(TypedDict, total=False):
@@ -53,9 +62,9 @@ class ProxyPattern(str):
 
     .. note::
 
-        Field names are replaced by :func:`~omniproxy.utils.get_formatted_proxy_string` when
-        rendering a :class:`Proxy` or :class:`~omniproxy.utils.OmniproxyParser`. Optional segments
-        (credentials, ``rotation_url`` in brackets) are collapsed when values are missing.
+        Field names are expanded at construction time into :meth:`str.format` templates so
+        rendering via :func:`~omniproxy.utils.get_formatted_proxy_string` avoids per-call token
+        regexes. Optional credential and ``rotation_url`` segments are still chosen at format time.
 
     Attributes
     ----------
@@ -65,7 +74,11 @@ class ProxyPattern(str):
         ``password``, ``ip``, ``port``, ``rotation_url``.
     """
 
-    __slots__ = ()
+    __slots__ = ("_fmt_auth", "_fmt_noauth", "_has_rotation_brackets")
+
+    _fmt_auth: str
+    _fmt_noauth: str
+    _has_rotation_brackets: bool
     ALLOWED_WORDS = PROXY_PATTERN_ALLOWED_WORDS
 
     def __new__(cls, pattern: str) -> ProxyPattern:
@@ -87,7 +100,24 @@ class ProxyPattern(str):
         for token in re.findall(r"\w+", pattern):
             if token not in cls.ALLOWED_WORDS:
                 raise ValueError(f"Unexpected word {token!r} in proxy pattern")
-        return str.__new__(cls, pattern)
+        instance = str.__new__(cls, pattern)
+
+        with_auth = str(pattern)
+        without_auth = REMOVE_USERNAME_RE.sub("", REMOVE_PASSWORD_RE.sub("", with_auth))
+        fmt_auth = TOKENS_RE.sub(
+            lambda m: "{" + m.group(0) + "}",
+            _collapse_pattern_after_optional_fields(with_auth),
+        )
+        fmt_noauth = TOKENS_RE.sub(
+            lambda m: "{" + m.group(0) + "}",
+            _collapse_pattern_after_optional_fields(without_auth),
+        )
+        has_rot = "[" in pattern and "]" in pattern
+        object.__setattr__(instance, "_fmt_auth", fmt_auth)
+        object.__setattr__(instance, "_fmt_noauth", fmt_noauth)
+        object.__setattr__(instance, "_has_rotation_brackets", has_rot)
+
+        return instance
 
 
 class Proxy(str):
@@ -155,6 +185,7 @@ class Proxy(str):
         "last_status",
         "latency",
         "org",
+        "_url",  # cached canonical URL
         "password",
         "port",
         "protocol",
@@ -178,6 +209,7 @@ class Proxy(str):
     city: str | None
     asn: str | None
     org: str | None
+    _url: str
 
     default_pattern = ProxyPattern(DEFAULT_PROXY_PATTERN_STRING)
     _structural_attributes = PROXY_STRUCTURAL_FIELDS
@@ -202,48 +234,62 @@ class Proxy(str):
             >>> Proxy("socks5://1.1.1.1:1080").protocol
             'socks5'
         """
+        # Source for metadata when rebuilding from an existing Proxy (protocol override).
+        metadata_source: Proxy | None = None
+
         # 1. FAST PATH
         if isinstance(proxy, Proxy):
+            # Fast path (protocol unchanged): return the same instance
+            # (no need to rebuild _url)
             if protocol is None or protocol.lower() == (proxy.protocol or "").lower():
                 return cast(Self, proxy)
 
-            dumped_data = proxy.to_dict()
+            metadata_source = proxy
+            structural: dict[str, Any] = {k: getattr(proxy, k) for k in cls._structural_attributes}
             p = protocol.lower()
-            if p not in ("http", "https", "socks5", "socks4"):
-                raise ValueError(f"Unsupported protocol: {protocol!r}")
+            try:
+                ProxyProtocol(p)
+            except ValueError:
+                raise ValueError(f"Unsupported protocol: {protocol!r}") from None
 
-            dumped_data["protocol"] = p
-            proxy_model = OmniproxyParser(**dumped_data)
+            structural["protocol"] = p
+            proxy_model = OmniproxyParser(**structural)
 
         # 2. RAW STRING PATH
         else:
             proxy_model = OmniproxyParser.from_string(proxy)
             if protocol:
                 p = protocol.lower()
-                if p not in ("http", "https", "socks5", "socks4"):
-                    raise ValueError(f"Unsupported protocol: {protocol!r}")
+                try:
+                    ProxyProtocol(p)
+                except ValueError:
+                    raise ValueError(f"Unsupported protocol: {protocol!r}") from None
                 proxy_model = msgspec.structs.replace(proxy_model, protocol=p)
 
-        # BUG FIX: Move this out of the `else` block to apply to both paths
         dumped_data = msgspec.structs.asdict(proxy_model)
 
         # 3. Create the underlying string representation
         proxy_string = get_formatted_proxy_string(proxy_model, cls.default_pattern)
         instance = super().__new__(cls, proxy_string)
+        instance._url = proxy_string  # cache the canonical URL
 
         # 4. Populate structural attributes natively
         for attr in cls._structural_attributes:
             object.__setattr__(instance, attr, dumped_data.get(attr))
 
-        # 5. Initialize metadata attributes
-        object.__setattr__(instance, "latency", None)
-        object.__setattr__(instance, "anonymity", None)
-        object.__setattr__(instance, "last_checked", None)
-        object.__setattr__(instance, "last_status", None)
-        object.__setattr__(instance, "country", None)
-        object.__setattr__(instance, "city", None)
-        object.__setattr__(instance, "asn", None)
-        object.__setattr__(instance, "org", None)
+        # 5. Metadata: preserve when cloning from another Proxy (e.g. protocol change); else defaults.
+        if metadata_source is not None:
+            for attr in cls._metadata_attributes:
+                object.__setattr__(instance, attr, getattr(metadata_source, attr))
+        else:
+            object.__setattr__(instance, "latency", None)
+            object.__setattr__(instance, "anonymity", None)
+            object.__setattr__(instance, "last_checked", None)
+            object.__setattr__(instance, "last_status", None)
+            object.__setattr__(instance, "country", None)
+            object.__setattr__(instance, "city", None)
+            object.__setattr__(instance, "asn", None)
+            object.__setattr__(instance, "org", None)
 
         return instance
 
@@ -307,7 +353,7 @@ class Proxy(str):
             >>> Proxy("127.0.0.1:80").url.startswith("http")
             True
         """
-        return str(self)
+        return self._url
 
     @property
     def safe_url(self) -> str:
@@ -479,15 +525,11 @@ class Proxy(str):
         """
         # Strip brackets from IPv6 (e.g., "[2001:db8::1]" -> "2001:db8::1")
         ip_string = self.ip.strip("[]")
-        try:
-            return ipaddress.ip_address(ip_string).version
-        except ValueError:
-            # If it fails, it's a hostname based on your check_ip validator
-            return None
+        return ipaddress.ip_address(ip_string).version
 
     def rotate(
         self,
-        method: Literal["GET", "POST"] = "GET",
+        method: HttpVerb | str = HttpVerb.GET,
         *,
         backend: str | None = None,
         timeout: float | None = None,
@@ -496,7 +538,7 @@ class Proxy(str):
         """Call :attr:`rotation_url` directly (no proxy) to trigger upstream rotation.
 
         Args:
-            method (Literal["GET", "POST"]): HTTP verb for the rotation request.
+            method (HttpVerb | str): HTTP verb for the rotation request (``GET`` or ``POST`` only).
             backend (str | None): Backend name; default from ``settings.default_backend``.
             timeout (float | None): Request timeout override.
             **kwargs (Any): Extra args forwarded to the backend ``request_direct``.
@@ -512,18 +554,18 @@ class Proxy(str):
             <bound method Proxy.rotate of ...>
         """
         from .backends.factory import get_backend
-        from .config import settings
 
         if not self.rotation_url:
             raise ValueError("This proxy has no rotation_url")
         impl = get_backend(backend)
         to = timeout if timeout is not None else settings.default_timeout
-        r = impl.request_direct(method, str(self.rotation_url), timeout=to, **kwargs)
+        verb = method if isinstance(method, HttpVerb) else HttpVerb(method)
+        r = impl.request_direct(verb.value, str(self.rotation_url), timeout=to, **kwargs)
         return r.status_code == 200
 
     async def arotate(
         self,
-        method: Literal["GET", "POST"] = "GET",
+        method: HttpVerb | str = HttpVerb.GET,
         *,
         backend: str | None = None,
         timeout: float | None = None,
@@ -532,7 +574,7 @@ class Proxy(str):
         """Async variant of :meth:`rotate`.
 
         Args:
-            method (Literal["GET", "POST"]): HTTP verb.
+            method (HttpVerb | str): HTTP verb.
             backend (str | None): Backend override.
             timeout (float | None): Timeout override.
             **kwargs (Any): Forwarded to ``arequest_direct``.
@@ -548,13 +590,13 @@ class Proxy(str):
             <bound method Proxy.arotate of ...>
         """
         from .backends.factory import get_backend
-        from .config import settings
 
         if not self.rotation_url:
             raise ValueError("This proxy has no rotation_url")
         impl = get_backend(backend)
         to = timeout if timeout is not None else settings.default_timeout
-        r = await impl.arequest_direct(method, str(self.rotation_url), timeout=to, **kwargs)
+        verb = method if isinstance(method, HttpVerb) else HttpVerb(method)
+        r = await impl.arequest_direct(verb.value, str(self.rotation_url), timeout=to, **kwargs)
         return r.status_code == 200
 
     @classmethod
@@ -736,11 +778,23 @@ class Proxy(str):
     def __bool__(self) -> bool:
         return self.is_working
 
-    def __copy__(self) -> Proxy:
-        return self
+    def _copy_with_same_state(self) -> Self:
+        """New instance with the same canonical URL and metadata snapshot (for copy protocols)."""
+        clone = self.__class__(str(self))
+        for k in self._metadata_attributes:
+            object.__setattr__(clone, k, getattr(self, k))
+        return cast(Self, clone)
 
-    def __deepcopy__(self, memo: dict) -> Proxy:
-        return self
+    def __copy__(self) -> Self:
+        return self._copy_with_same_state()
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        i = id(self)
+        if i in memo:
+            return memo[i]
+        clone = self._copy_with_same_state()
+        memo[i] = clone
+        return clone
 
 
 __all__ = ["PlaywrightProxySettings", "Proxy", "ProxyPattern"]

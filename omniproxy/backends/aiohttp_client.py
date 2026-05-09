@@ -77,15 +77,14 @@ class AiohttpBackend(BaseBackend):
             >>> AiohttpBackend.aget.__name__
             'aget'
         """
-        try:
-            from aiohttp_socks import ProxyConnector
-        except ImportError as e:
-            raise ImportError(
-                "Install with 'uv add omniproxy --extra aiohttp' (needs aiohttp-socks for SOCKS)."
-            ) from e
-
         to = ClientTimeout(total=timeout)
         if "socks" in proxy.protocol:
+            try:
+                from aiohttp_socks import ProxyConnector
+            except ImportError as e:
+                raise ImportError(
+                    "Install with 'uv add omniproxy --extra aiohttp' (needs aiohttp-socks for SOCKS)."
+                ) from e
             connector = ProxyConnector.from_url(proxy.url)
             proxy_url = None
         else:

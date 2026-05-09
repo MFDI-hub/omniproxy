@@ -10,13 +10,13 @@ from omniproxy import Proxy, acheck_proxies, acheck_proxy, check_proxies, check_
 
 
 def _read_multiline_proxies_from_dotenv() -> str | None:
-    """Return full ``PROXIES=[...]`` JSON text from ``.env`` when dotenv only loaded the first line."""
+    """Return full ``PROXY_LIST=[...]`` JSON text from ``.env`` when dotenv only loaded the first line."""
     env_path = Path(__file__).resolve().parents[1] / ".env"
     if not env_path.is_file():
         return None
     lines = env_path.read_text(encoding="utf-8").splitlines()
     for i, line in enumerate(lines):
-        if not line.lstrip().startswith("PROXIES="):
+        if not line.lstrip().startswith("PROXY_LIST="):
             continue
         after = line.split("=", 1)[1].lstrip()
         if after[:1] in {'"', "'"}:
@@ -43,7 +43,7 @@ def _read_multiline_proxies_from_dotenv() -> str | None:
 
 
 def _proxies_raw_json_string() -> str:
-    env_raw = os.environ.get("PROXIES", "").strip()
+    env_raw = os.environ.get("PROXY_LIST", "").strip()
     if env_raw:
         try:
             data = json.loads(env_raw)
@@ -81,9 +81,9 @@ _SOCKS_FROM_LIST = next(
     "",
 )
 
-# Live checks: ``OMNIPROXY_LIVE_TESTS=1`` plus a parsed ``PROXIES`` list and/or explicit
+# Live checks: ``OMNIPROXY_LIVE_TESTS=1`` plus a parsed ``PROXY_LIST`` list and/or explicit
 # ``REAL_HTTP_PROXY`` / ``REAL_SOCKS5_PROXY``. All-HTTP lists use a second entry for
-# ``self.sp`` when no ``socks5://`` URL appears in ``PROXIES``.
+# ``self.sp`` when no ``socks5://`` URL appears in ``PROXY_LIST``.
 REAL_HTTP_PROXY = _ENV_HTTP or (_PROXY_LIST[0] if _PROXY_LIST else "127.0.0.1:8080")
 if _ENV_SOCKS or _SOCKS_FROM_LIST:
     REAL_SOCKS5_PROXY = _ENV_SOCKS or _SOCKS_FROM_LIST
@@ -98,14 +98,25 @@ _LIVE_CONFIGURED = bool(_PROXY_LIST) or (bool(_ENV_HTTP) and bool(_ENV_SOCKS))
 LIVE = os.environ.get("OMNIPROXY_LIVE_TESTS") == "1" and _LIVE_CONFIGURED
 
 _LIVE_SKIP_MSG = (
-    "Set OMNIPROXY_LIVE_TESTS=1 and PROXIES as a JSON array (multi-line unquoted in .env is "
+    "Set OMNIPROXY_LIVE_TESTS=1 and PROXY_LIST as a JSON array (multi-line unquoted in .env is "
     "read from the file when needed), and/or REAL_HTTP_PROXY and REAL_SOCKS5_PROXY."
 )
 
-_SOCKS_FAIL_ERRORS = (
-    python_socks._errors.ProxyConnectionError,
-    python_socks._errors.ProxyTimeoutError,
-)
+try:
+    from curl_cffi.requests.exceptions import RequestException as _CurlRequestException
+
+    _HTTP_PROXY_FAIL_ERRORS = (httpx.HTTPError, _CurlRequestException)
+    _SOCKS_FAIL_ERRORS = (
+        python_socks._errors.ProxyConnectionError,
+        python_socks._errors.ProxyTimeoutError,
+        _CurlRequestException,
+    )
+except ImportError:
+    _HTTP_PROXY_FAIL_ERRORS = (httpx.HTTPError,)
+    _SOCKS_FAIL_ERRORS = (
+        python_socks._errors.ProxyConnectionError,
+        python_socks._errors.ProxyTimeoutError,
+    )
 
 
 class TestCheck(unittest.TestCase):
@@ -176,7 +187,7 @@ class TestCheck(unittest.TestCase):
         self.assertFalse(check_proxy(self.fp, timeout=quick)[1])
         self.assertFalse(check_proxy(self.fsp, timeout=quick)[1])
 
-        with self.assertRaises(httpx.HTTPError):
+        with self.assertRaises(_HTTP_PROXY_FAIL_ERRORS):
             check_proxy(self.fp, raise_on_error=True, timeout=quick)
         with self.assertRaises(_SOCKS_FAIL_ERRORS):
             check_proxy(self.fsp, raise_on_error=True, timeout=quick)
@@ -191,7 +202,7 @@ class TestCheck(unittest.TestCase):
         self.assertFalse(r[0][1])
         self.assertFalse(r[1][1])
 
-        with self.assertRaises(httpx.HTTPError):
+        with self.assertRaises(_HTTP_PROXY_FAIL_ERRORS):
             asyncio.run(acheck_proxy(self.fp, raise_on_error=True, timeout=quick))
         with self.assertRaises(_SOCKS_FAIL_ERRORS):
             asyncio.run(acheck_proxy(self.fsp, raise_on_error=True, timeout=quick))
@@ -201,7 +212,7 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(check_proxies([self.fp], timeout=quick)[1][0], self.fp)
         self.assertEqual(check_proxies([self.fsp], use_async=False, timeout=quick)[1][0], self.fsp)
 
-        with self.assertRaises(httpx.HTTPError):
+        with self.assertRaises(_HTTP_PROXY_FAIL_ERRORS):
             check_proxies([self.fp], raise_on_error=True, timeout=quick)
         with self.assertRaises(_SOCKS_FAIL_ERRORS):
             check_proxies([self.fsp], raise_on_error=True, use_async=False, timeout=quick)

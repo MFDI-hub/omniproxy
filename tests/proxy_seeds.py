@@ -1,11 +1,11 @@
-"""Resolve proxy strings from ``PROXIES`` (JSON list in env, e.g. from ``.env``).
+"""Resolve proxy strings from ``PROXY_LIST`` (JSON list in env, e.g. from ``.env``).
 
-When ``PROXIES`` is set, :func:`seeds` returns only those entries—no synthetic padding—so
+When ``PROXY_LIST`` is set, :func:`seeds` returns only those entries—no synthetic padding—so
 pool tests exercise real :class:`~omniproxy.extended_proxy.Proxy` parsing and pool bookkeeping
 against your actual list. If the list is shorter than a test module requires, a clear
 :class:`ValueError` is raised.
 
-When ``PROXIES`` is unset or invalid, built-in RFC-style offline placeholders are used (see
+When ``PROXY_LIST`` is unset or invalid, built-in RFC-style offline placeholders are used (see
 ``_SYNTH``), and extra slots are padded only in that mode for CI.
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 
-# Offline defaults when ``PROXIES`` is unset (CI / local without .env).
+# Offline defaults when ``PROXY_LIST`` is unset (CI / local without .env).
 _SYNTH: tuple[str, ...] = (
     "10.0.0.1:8001",
     "10.0.0.2:8002",
@@ -29,7 +29,7 @@ _FULL_FROM_ENV: bool = False
 
 
 def _parse_env_proxies() -> list[str]:
-    raw = os.environ.get("PROXIES", "").strip()
+    raw = os.environ.get("PROXY_LIST", "").strip()
     if not raw:
         return []
     try:
@@ -60,7 +60,7 @@ def _ensure_full() -> None:
 
 
 def all_seeds() -> list[str]:
-    """All entries from ``PROXIES``, or the built-in synthetic list if env is empty."""
+    """All entries from ``PROXY_LIST``, or the built-in synthetic list if env is empty."""
     _ensure_full()
     return list(_FULL or ())
 
@@ -68,7 +68,7 @@ def all_seeds() -> list[str]:
 def seeds(n: int) -> list[str]:
     """Return the first ``n`` seed strings.
 
-    If ``PROXIES`` is set, raises :class:`ValueError` when fewer than ``n`` entries exist
+    If ``PROXY_LIST`` is set, raises :class:`ValueError` when fewer than ``n`` entries exist
     (tests must not invent extra hosts beside your real list). Offline mode pads only the
     synthetic fallback list when ``n`` is larger than ``_SYNTH``.
     """
@@ -78,8 +78,8 @@ def seeds(n: int) -> list[str]:
     if _FULL_FROM_ENV:
         if len(base) < n:
             raise ValueError(
-                f"PROXIES must contain at least {n} non-empty strings (found {len(base)}). "
-                "Add more entries in .env or unset PROXIES to use bundled offline defaults."
+                f"PROXY_LIST must contain at least {n} non-empty strings (found {len(base)}). "
+                "Add more entries in .env or unset PROXY_LIST to use bundled offline defaults."
             )
         return base[:n]
     i = 0

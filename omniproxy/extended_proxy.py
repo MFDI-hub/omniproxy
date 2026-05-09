@@ -18,6 +18,7 @@ from .constants import (
     DEFAULT_RETRYABLE_HTTP_STATUSES,
     URL_HEADERS_PROBE,
 )
+from .enum import AnonymityLeakHeader, AnonymityTier
 from .proxy import Proxy as BaseProxy
 
 if TYPE_CHECKING:
@@ -63,6 +64,12 @@ def _check_exceptions() -> tuple[type[BaseException], ...]:
         import aiohttp
 
         out.append(aiohttp.ClientError)
+    except ImportError:
+        pass
+    try:
+        from curl_cffi.requests import errors as curl_errors
+
+        out.append(curl_errors.RequestsError)
     except ImportError:
         pass
     return tuple(out)
@@ -136,14 +143,14 @@ def _classify_anonymity(headers: Mapping[str, str]) -> str:
         >>> _classify_anonymity({"X-Forwarded-For": "1.2.3.4"})
         'transparent'
     """
-    for leak in ("x-forwarded-for", "via", "forwarded"):
+    for leak in AnonymityLeakHeader:
         for k, v in headers.items():
-            if k.lower() == leak and str(v or "").strip():
-                return "transparent"
+            if k.lower() == leak.value and str(v or "").strip():
+                return AnonymityTier.TRANSPARENT.value
     for k in headers:
         if k.lower() == "proxy-connection":
-            return "anonymous"
-    return "elite"
+            return AnonymityTier.ANONYMOUS.value
+    return AnonymityTier.ELITE.value
 
 
 @dataclass(slots=True)
@@ -164,12 +171,18 @@ class CheckResult:
         Optional exception **type** (not an instance) caught during the attempt, if any.
     status_code: Optional[:class:`int`]
         HTTP status from the backend response when a response existed; ``None`` on connection errors.
+    error: Optional[:class:`str`]
+        Optional human-readable failure detail (v2.1).
+    proxy_id: Optional[:class:`str`]
+        Optional stable proxy identifier for diagnostics (v2.1).
     """
 
     success: bool
     latency: float | None
     exc_type: type[BaseException] | None
     status_code: int | None
+    error: str | None = None
+    proxy_id: str | None = None
 
     def __bool__(self) -> bool:
         """Return :attr:`success` for truthiness tests.
@@ -246,6 +259,7 @@ class Proxy(BaseProxy):
     """
 
     __slots__ = ()
+    _url: str  # Canonical URL cached on base instances; reiterated for typing in subclasses.
 
     def get_info(self, fields: str = DEFAULT_CHECK_FIELDS, **kwargs: Any) -> dict[str, str]:
         """Run a synchronous info check and return the JSON mapping.
@@ -836,6 +850,13 @@ def run_health_check(
     """
     Run a full health check against *proxy* using *hc* config.
     """
+    if hc.custom_check is not None:
+        if not isinstance(proxy, Proxy):
+            proxy = Proxy(proxy)
+        ok = hc.custom_check(proxy)
+        res = CheckResult(success=ok, latency=None, exc_type=None, status_code=None)
+        return proxy, res
+
     url = _resolve_health_check_url(hc.url)
 
     p, result = check_proxy(
@@ -872,6 +893,13 @@ async def arun_health_check(
         >>> arun_health_check.__name__
         'arun_health_check'
     """
+    if hc.custom_check is not None:
+        if not isinstance(proxy, Proxy):
+            proxy = Proxy(proxy)
+        ok = hc.custom_check(proxy)
+        res = CheckResult(success=ok, latency=None, exc_type=None, status_code=None)
+        return proxy, res
+
     url = _resolve_health_check_url(hc.url)
 
     p, result = await acheck_proxy(

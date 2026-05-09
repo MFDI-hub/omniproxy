@@ -4,7 +4,8 @@ import ipaddress
 import re
 import urllib.parse
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Literal, cast
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any
 
 import msgspec
 
@@ -14,6 +15,7 @@ from .constants import (
     PROXY_FORMATS_REGEXP,
     PROXY_STRUCTURAL_FIELDS,
 )
+from .enum import ProxyProtocol
 
 if TYPE_CHECKING:
     from .proxy import Proxy, ProxyPattern
@@ -41,6 +43,31 @@ REMOVE_PASSWORD_RE = re.compile(r"\bpassword\b")
 _STRUCTURAL_FIELDS_PATTERN = rf"\b(?:{'|'.join(PROXY_STRUCTURAL_FIELDS)})\b"
 TOKENS_RE = re.compile(_STRUCTURAL_FIELDS_PATTERN)
 # ==========================================
+
+
+def _validate_ip_or_normalize_host(v_stripped: str) -> str:
+    """Validate and normalise hostname / IP via C-backed :mod:`ipaddress`."""
+    ip_to_test = v_stripped.strip("[]")
+
+    try:
+        ipa = ipaddress.ip_address(ip_to_test)
+    except ValueError:
+        pass
+    else:
+        if isinstance(ipa, ipaddress.IPv6Address):
+            if ":" in ip_to_test and not v_stripped.startswith("["):
+                return f"[{v_stripped}]"
+            return v_stripped
+        return v_stripped
+
+    if DOTTED_NUMERIC_RE.fullmatch(v_stripped):
+        raise ValueError(f"Invalid IP address: {v_stripped!r}")
+
+    host = v_stripped.rstrip(".")
+    if HOSTNAME_RE.match(host):
+        return v_stripped
+
+    raise ValueError(f"Invalid IP or hostname: {v_stripped!r}")
 
 
 def _proxy_format_groupdict(stripped: str) -> dict[str, str | None] | None:
@@ -114,34 +141,11 @@ class OmniproxyParser(msgspec.Struct):
         if not (0 < self.port <= 65535):
             raise ValueError(f"Port must be between 1 and 65535, got {self.port}")
 
-        # 2. IP validation
+        # 2. IP validation — fast rejects; uncommon textual forms hit :mod:`ipaddress` once.
         v_stripped = self.ip.strip()
         if not v_stripped:
             raise ValueError("ip/host must not be empty")
-
-        ip_to_test = v_stripped.strip("[]")
-        is_valid_ip = False
-        try:
-            ipaddress.ip_address(ip_to_test)
-            is_valid_ip = True
-            # If it's a valid IPv6, ensure it's bracketed for URL safety
-            if ":" in ip_to_test and not v_stripped.startswith("["):
-                self.ip = f"[{v_stripped}]"
-            else:
-                self.ip = v_stripped
-        except ValueError:
-            pass
-
-        if not is_valid_ip:
-            # Reject dotted-numeric strings that are not valid IPs
-            if DOTTED_NUMERIC_RE.fullmatch(v_stripped):
-                raise ValueError(f"Invalid IP address: {v_stripped!r}")
-
-            host = v_stripped.rstrip(".")
-            if HOSTNAME_RE.match(host):
-                self.ip = v_stripped
-            else:
-                raise ValueError(f"Invalid IP or hostname: {v_stripped!r}")
+        self.ip = _validate_ip_or_normalize_host(v_stripped)
 
         # 3. URL Validation
         if self.rotation_url:
@@ -228,17 +232,16 @@ class OmniproxyParser(msgspec.Struct):
             53
         """
         raw_proto = (groups.get("protocol") or "http").lower()
-        if raw_proto not in ("http", "https", "socks5", "socks4"):
-            raise ValueError(f"Unsupported protocol: {raw_proto!r}")
+        try:
+            _proto = ProxyProtocol(raw_proto).value
+        except ValueError as e:
+            raise ValueError(f"Unsupported protocol: {raw_proto!r}") from e
         # The regex patterns guarantee "ip" and "port" are captured whenever any
         # pattern matches, so these values are never None at this point.
         _ip = groups["ip"]
         _port = groups["port"]
         assert _ip is not None and _port is not None, (
             "regex match must capture 'ip' and 'port' groups"
-        )
-        _proto: Literal["http", "https", "socks5", "socks4"] = cast(
-            Literal["http", "https", "socks5", "socks4"], raw_proto
         )
         return cls(
             protocol=_proto,
@@ -273,7 +276,35 @@ def _collapse_pattern_after_optional_fields(pattern: str) -> str:
     s = COLLAPSE_BRACKET_COLON_RE.sub("[", s)
     s = COLLAPSE_COLON_BRACKET_RE.sub("]", s)
     s = COLLAPSE_START_BRACKETS_RE.sub("[", s)
-    return COLLAPSE_END_BRACKETS_RE.sub("]", s)
+    return COLLAPSE_END_BRACKETS_RE.sub("]", s).rstrip("@")
+
+
+@lru_cache(maxsize=512)
+def _preprocessed_pattern_skeleton(
+    pattern: str,
+    has_rotation_url: bool,
+    has_username: bool,
+    has_password: bool,
+) -> str:
+    s = pattern
+    if not has_rotation_url:
+        s = REMOVE_BRACKETS_RE.sub("", s)
+
+    if not has_username:
+        s = REMOVE_USERNAME_RE.sub("", s)
+        s = REMOVE_PASSWORD_RE.sub("", s)
+    elif not has_password:
+        s = REMOVE_PASSWORD_RE.sub("", s)
+
+    return _collapse_pattern_after_optional_fields(s)
+
+
+def _substitution_kwargs(dumped: dict[str, Any]) -> dict[str, Any]:
+    """Map ``None`` structural fields to empty strings so :meth:`str.format` does not emit ``'None'``."""
+    out: dict[str, Any] = {}
+    for k, v in dumped.items():
+        out[k] = "" if v is None else v
+    return out
 
 
 def get_formatted_proxy_string(proxy: Proxy | OmniproxyParser, pattern: str | ProxyPattern) -> str:
@@ -292,11 +323,11 @@ def get_formatted_proxy_string(proxy: Proxy | OmniproxyParser, pattern: str | Pr
         >>> get_formatted_proxy_string(p, "ip:port")
         '1.1.1.1:8080'
     """
+    from .proxy import ProxyPattern
 
     if isinstance(proxy, OmniproxyParser):
         dumped = msgspec.structs.asdict(proxy)
     else:
-        # Assuming proxy is a type where these properties exist
         dumped = {
             "protocol": proxy.protocol,
             "ip": proxy.ip,
@@ -306,18 +337,24 @@ def get_formatted_proxy_string(proxy: Proxy | OmniproxyParser, pattern: str | Pr
             "rotation_url": proxy.rotation_url,
         }
 
-    s = str(pattern)
+    if isinstance(pattern, ProxyPattern):
+        fmt = (
+            getattr(pattern, "_fmt_auth")
+            if dumped.get("username")
+            else getattr(pattern, "_fmt_noauth")
+        )
+        if not dumped.get("rotation_url") and getattr(pattern, "_has_rotation_brackets"):
+            fmt = REMOVE_BRACKETS_RE.sub("", fmt)
+            fmt = _collapse_pattern_after_optional_fields(fmt)
+        sub = _substitution_kwargs(dumped)
+        return fmt.format_map(sub)
 
-    if not dumped.get("rotation_url"):
-        s = REMOVE_BRACKETS_RE.sub("", s)
-
-    if not dumped.get("username"):
-        s = REMOVE_USERNAME_RE.sub("", s)
-        s = REMOVE_PASSWORD_RE.sub("", s)
-    elif not dumped.get("password"):
-        s = REMOVE_PASSWORD_RE.sub("", s)
-
-    s = _collapse_pattern_after_optional_fields(s)
+    s = _preprocessed_pattern_skeleton(
+        str(pattern),
+        bool(dumped.get("rotation_url")),
+        bool(dumped.get("username")),
+        bool(dumped.get("password")),
+    )
 
     values: list[str] = []
 

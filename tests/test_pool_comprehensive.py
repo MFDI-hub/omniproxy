@@ -1,9 +1,9 @@
 """Pool behaviour tests using :func:`~tests.proxy_seeds.seeds`.
 
-Strings come from the ``PROXIES`` JSON list in the environment (loaded via ``conftest``).
+Strings come from the ``PROXY_LIST`` JSON list in the environment (loaded via ``conftest``).
 Assertions are based on :class:`~omniproxy.extended_proxy.Proxy` normalization (``url``,
 ``port``, ``_key`` / membership) and pool state, not hard-coded hosts. At least four
-``PROXIES`` entries are required when using a real list.
+``PROXY_LIST`` entries are required when using a real list.
 """
 
 from __future__ import annotations
@@ -91,7 +91,9 @@ class TestBaseShared:
         assert "30.0" in r or "30" in r
 
     def test_proxies_property_purges_expired_cooldown(self) -> None:
-        pool = SyncProxyPool([S0], PoolConfig(cooldown=0.01, failure_threshold=1))
+        pool = SyncProxyPool(
+            [S0], PoolConfig(cooldown=0.01, failure_threshold=1, min_cooldown=0.0)
+        )
         pool.mark_failed(S0)
         assert len(pool.proxies) == 0
         t0 = 1_000_000.0
@@ -145,7 +147,7 @@ class TestBaseShared:
         k = pool._key(Proxy(S0))
         with pool._lock:
             until = pool._state._cooldown_until[k]
-        assert until >= t0 + 29.0  # 10 * 3
+        assert until >= t0 + 44.0  # adaptive base 10*1.5 * penalty 3
 
     def test_mark_success_clears_failures(self) -> None:
         pool = SyncProxyPool([S0], PoolConfig(failure_threshold=5))
@@ -190,7 +192,9 @@ class TestBaseShared:
         assert "failed" in log and "cooled" in log
 
     def test_cooldown_reentry_after_elapse(self) -> None:
-        pool = SyncProxyPool([S0], PoolConfig(cooldown=0.05, failure_threshold=1))
+        pool = SyncProxyPool(
+            [S0], PoolConfig(cooldown=0.05, failure_threshold=1, min_cooldown=0.0)
+        )
         t0 = 5_000_000.0
         with mock.patch("time.monotonic", return_value=t0):
             pool.mark_failed(S0)

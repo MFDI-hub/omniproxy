@@ -7,10 +7,11 @@ import ssl
 import urllib.request
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Literal
+from typing import IO, TYPE_CHECKING
 
 from .config import settings
 from .constants import DEFAULT_FETCH_USER_AGENT, PROXY_LINE_PATTERN
+from .enum import IoInvalidLinePolicy
 
 if TYPE_CHECKING:
     from .extended_proxy import Proxy
@@ -20,7 +21,7 @@ def read_proxies(
     filepath: str | Path,
     *,
     encoding: str = "utf-8",
-    on_invalid: Literal["raise", "skip"] = "raise",
+    on_invalid: IoInvalidLinePolicy | str = IoInvalidLinePolicy.RAISE,
     errors_out: list[tuple[int, str, str]] | None = None,
 ) -> list[Proxy]:
     """Read newline-separated proxies from a text file.
@@ -28,7 +29,7 @@ def read_proxies(
     Args:
         filepath (str | Path): Path to the file.
         encoding (str): Text encoding for the file open call.
-        on_invalid (Literal["raise", "skip"]): Whether invalid lines raise or are skipped.
+        on_invalid (IoInvalidLinePolicy | str): Whether invalid lines raise or are skipped.
         errors_out (list[tuple[int, str, str]] | None): If set, append ``(lineno, line, error)``.
 
     Returns:
@@ -52,6 +53,7 @@ def read_proxies(
     from .extended_proxy import Proxy
 
     path = Path(filepath)
+    policy = on_invalid if isinstance(on_invalid, IoInvalidLinePolicy) else IoInvalidLinePolicy(on_invalid)
     out: list[Proxy] = []
     with path.open(encoding=encoding, errors="replace") as f:
         for lineno, line in enumerate(f, start=1):
@@ -63,7 +65,7 @@ def read_proxies(
             except ValueError as e:
                 if errors_out is not None:
                     errors_out.append((lineno, s, str(e)))
-                if on_invalid == "raise":
+                if policy == IoInvalidLinePolicy.RAISE:
                     raise ValueError(f"line {lineno}: invalid proxy {s!r}: {e}") from e
     return out
 
@@ -106,7 +108,7 @@ def iter_proxies_from_file(
     filepath: str | Path,
     *,
     encoding: str = "utf-8",
-    on_invalid: Literal["raise", "skip"] = "raise",
+    on_invalid: IoInvalidLinePolicy | str = IoInvalidLinePolicy.RAISE,
     errors_out: list[tuple[int, str, str]] | None = None,
 ) -> Iterable[Proxy]:
     """Stream one :class:`~omniproxy.extended_proxy.Proxy` per non-empty line.
@@ -114,7 +116,7 @@ def iter_proxies_from_file(
     Args:
         filepath (str | Path): Path to the file.
         encoding (str): Text encoding.
-        on_invalid (Literal["raise", "skip"]): Behaviour on invalid lines.
+        on_invalid (IoInvalidLinePolicy | str): Behaviour on invalid lines.
         errors_out (list[tuple[int, str, str]] | None): Optional collector for errors.
 
     Returns:
@@ -137,21 +139,22 @@ def iter_proxies_from_file(
     """
 
     path = Path(filepath)
+    policy = on_invalid if isinstance(on_invalid, IoInvalidLinePolicy) else IoInvalidLinePolicy(on_invalid)
     with path.open(encoding=encoding, errors="replace") as f:
-        yield from _iter_proxies_from_text_stream(f, on_invalid=on_invalid, errors_out=errors_out)
+        yield from _iter_proxies_from_text_stream(f, on_invalid=policy, errors_out=errors_out)
 
 
 def _iter_proxies_from_text_stream(
     stream: IO[str],
     *,
-    on_invalid: Literal["raise", "skip"],
+    on_invalid: IoInvalidLinePolicy,
     errors_out: list[tuple[int, str, str]] | None,
 ) -> Iterable[Proxy]:
     """Yield proxies from a text stream (one non-empty line at a time).
 
     Args:
         stream (IO[str]): Readable text stream.
-        on_invalid (Literal["raise", "skip"]): Error handling for bad lines.
+        on_invalid (IoInvalidLinePolicy): Error handling for bad lines.
         errors_out (list[tuple[int, str, str]] | None): Optional error collector.
 
     Returns:
@@ -162,10 +165,11 @@ def _iter_proxies_from_text_stream(
 
     Example:
         >>> from io import StringIO
+        >>> from omniproxy.enum import IoInvalidLinePolicy
         >>> from omniproxy.io import _iter_proxies_from_text_stream
         >>> next(
         ...     _iter_proxies_from_text_stream(
-        ...         StringIO("127.0.0.1:3" + chr(10)), on_invalid="raise", errors_out=None
+        ...         StringIO("127.0.0.1:3" + chr(10)), on_invalid=IoInvalidLinePolicy.RAISE, errors_out=None
         ...     )
         ... ).port
         3
@@ -181,7 +185,7 @@ def _iter_proxies_from_text_stream(
         except ValueError as e:
             if errors_out is not None:
                 errors_out.append((lineno, s, str(e)))
-            if on_invalid == "raise":
+            if on_invalid == IoInvalidLinePolicy.RAISE:
                 raise ValueError(f"line {lineno}: invalid proxy {s!r}: {e}") from e
 
 

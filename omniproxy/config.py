@@ -1,14 +1,15 @@
-"""Global defaults for omniproxy (backends, timeouts, check URLs)."""
+"""Global defaults for omniproxy v2.1 (backends, timeouts, check URLs, scoring, circuit breaker)."""
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from .extended_proxy import CheckResult, Proxy
+    from .extended_proxy import CheckResult
 
 from .constants import (
     DEFAULT_BACKEND,
@@ -19,216 +20,269 @@ from .constants import (
     OMNIPROXY_CONFIG_PUBLIC_KEYS,
     VALID_BACKENDS,
 )
+from .enum import (
+    FilterMissingMetadata,
+    HealthStrategy,
+    PoolStrategy,
+    PoolStructure,
+    SessionCooldownPolicy,
+    WarmupFailurePolicy,
+)
 
-Strategy = Literal["round_robin", "random"]
-Structure = Literal["list", "deque"]
-HealthStrategy = Literal["on_failure", "on_failure_recover", "ttl", "ttl_and_failure"]
+Strategy = PoolStrategy
+Structure = PoolStructure
+
+
+# v2.1: New protocols
+class TokenBucketProtocol(Protocol):
+    def consume(self, tokens: int = 1) -> bool: ...
+    def refill(self) -> None: ...
+    def tokens_available(self) -> float: ...
+
+
+class MetricsExporter(Protocol):
+    def emit_gauge(self, name: str, value: float, tags: dict[str, str] | None = None) -> None: ...
+    def emit_counter(self, name: str, value: float, tags: dict[str, str] | None = None) -> None: ...
+    def close(self) -> None: ...
+
+
+class StateStore(Protocol):
+    def get(self, key: str) -> float | None: ...
+    def set(self, key: str, value: float, ttl: float | None = None) -> None: ...
+    def delete(self, key: str) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# New configuration dataclasses for v2.1
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class ScoringConfig:
+    window_seconds: float = 300.0
+    decay_factor: float = 0.9  # EMA decay for latency (0<decay≤1)
+    success_weight: float = 0.6
+    latency_weight: float = 0.4
+    min_samples: int = 5
+    eviction_threshold: float = 0.2
+    eviction_grace_period: float = 60.0  # seconds score must stay below threshold
+
+
+@dataclass(slots=True)
+class CircuitBreakerConfig:
+    window_seconds: float = 60.0
+    failure_ratio: float = 0.5
+    half_open_timeout: float = 30.0
+    min_throughput: int = 10
 
 
 @dataclass(slots=True)
 class HealthCheckConfig:
-    """HTTP probe configuration used by :func:`~omniproxy.extended_proxy.run_health_check` / :func:`~omniproxy.extended_proxy.arun_health_check`.
-
-    When stored on :attr:`PoolConfig.health_check`, :class:`~omniproxy.pool.ProxyPool` can run
-    :meth:`~omniproxy.pool.ProxyPool.start_monitoring` (or the threaded variant) to re-check
-    proxies on a timer and call :attr:`PoolConfig.hooks.on_check_complete`, then :meth:`~omniproxy.pool.ProxyPool.mark_success`
-    or :meth:`~omniproxy.pool.ProxyPool.mark_failed` depending on the :class:`CheckResult`.
-
-    Attributes
-    ----------
-    url: Optional[:class:`str`]
-        Absolute URL for the health request. If ``None``, a URL is chosen from
-        ``settings.health_check_urls`` or ``settings.default_check_urls`` (see
-        :class:`OmniproxyConfig`).
-    headers: :class:`dict` [:class:`str`, :class:`str`]
-        Extra headers sent with every probe (e.g. API keys). Defaults to empty.
-    expected_status: Optional[:class:`int`]
-        HTTP status code treated as success. ``None`` means any **2xx** response is accepted.
-        Default ``200``.
-    expected_fields: Optional[:class:`set` [:class:`str`]]
-        If set, the JSON body must be a :class:`dict` containing **all** of these keys.
-    timeout: Optional[:class:`float`]
-        Per-request timeout in seconds for the backend. ``None`` falls back to backend defaults.
-    strategy
-        Literal ``HealthStrategy``: ``on_failure``, ``on_failure_recover``, ``ttl``, or ``ttl_and_failure``.
-        Reserved for future policy tuning around how failures interact with cooldowns.
-    recovery_interval: :class:`float`
-        Seconds to sleep between full passes in the pool health loop.
-    ttl: Optional[:class:`float`]
-        Optional soft TTL for proxy freshness; reserved for callers that interpret it.
-    """
+    """Now supports custom_check, method, expected_json_fields per v2.1 spec."""
 
     url: str | None = None
-    headers: dict[str, str] = field(default_factory=dict)
+    method: str = "GET"
     expected_status: int | None = 200
-    expected_fields: set[str] | None = None
+    expected_fields: set[str] | None = None  # backwards compat
+    expected_json_fields: dict[str, Any] | None = None  # new
     timeout: float | None = None
-    strategy: HealthStrategy = "on_failure"
+    headers: dict[str, str] = field(default_factory=dict)
     recovery_interval: float = 60.0
-    ttl: float | None = None
+    custom_check: Callable[[Any], bool] | None = None  # Any = Proxy
 
 
 @dataclass(slots=True)
 class LimitsConfig:
-    """Concurrency and per-URL selection rate caps for :class:`PoolConfig`.
-
-    Mounted at :attr:`PoolConfig.limits` and read by :class:`~omniproxy.pool.ProxyPool` when choosing
-    the next proxy.
-
-    Attributes
-    ----------
-    max_connections_per_proxy: Optional[:class:`int`]
-        If set, caps concurrent in-flight uses per canonical proxy URL (context managers count).
-    max_rps_per_proxy: Optional[:class:`float`]
-        If set, token-bucket limit on **selections** per URL (requests per second), not HTTP RPS.
-    """
-
     max_connections_per_proxy: int | None = None
     max_rps_per_proxy: float | None = None
+    token_bucket_capacity: float = 1.0
+    token_bucket_factory: Callable[[Any], TokenBucketProtocol] | None = None  # Any = Proxy
 
 
+# Existing LifecycleHooks, extended with v2.1 callbacks
 @dataclass(slots=True)
 class LifecycleHooks:
-    """Optional callbacks for pool saturation, exhaustion, proxy accounting, and health probes.
-
-    Mounted at :attr:`PoolConfig.hooks` and invoked by :class:`~omniproxy.pool.SyncProxyPool` /
-    :class:`~omniproxy.pool.AsyncProxyPool`.
-
-    Attributes
-    ----------
-    on_saturated: Optional[Callable[[], None]]
-        When proxies match filters but every match is at connection or RPS limits (:exc:`~omniproxy.errors.PoolSaturated`).
-    on_exhausted: Optional[Callable[[], None]]
-        When the active set is empty before attempting :attr:`PoolConfig.refresh_callback` /
-        :attr:`PoolConfig.arefresh_callback`.
-    on_proxy_failed: Optional[Callable]
-        ``(proxy, exc_type | None)`` after accounting for a failure.
-    on_proxy_cooled_down: Optional[Callable]
-        ``(proxy)`` when a proxy moves to cooldown.
-    on_proxy_recovered: Optional[Callable]
-        ``(proxy)`` when a proxy returns from cooldown or failure streak clears.
-    on_check_complete: Optional[Callable]
-        ``(proxy, check_result)`` after each health probe in the background loop.
-    on_proxy_acquired: Optional[Callable]
-        ``(proxy)`` after a successful :meth:`~omniproxy.pool.ProxyPool.get_next` / :meth:`~omniproxy.pool.ProxyPool.aget_next`.
-    on_proxy_released: Optional[Callable]
-        ``(proxy)`` when a context manager releases the in-flight slot.
-    """
-
-    on_saturated: Callable[[], None] | None = None
+    on_proxy_acquired: Callable[[Any], None] | None = None  # Proxy
+    on_proxy_released: Callable[[Any], None] | None = None  # Proxy
+    on_proxy_failed: Callable[[Any, type | None], None] | None = None  # Proxy, exc type
+    on_proxy_cooled_down: Callable[[Any], None] | None = None
+    on_proxy_recovered: Callable[[Any], None] | None = None
     on_exhausted: Callable[[], None] | None = None
-    on_proxy_failed: Callable[[Proxy, type | None], None] | None = None
-    on_proxy_cooled_down: Callable[[Proxy], None] | None = None
-    on_proxy_recovered: Callable[[Proxy], None] | None = None
-    on_check_complete: Callable[[Proxy, CheckResult], None] | None = None
-    on_proxy_acquired: Callable[[Proxy], None] | None = None
-    on_proxy_released: Callable[[Proxy], None] | None = None
+    on_saturated: Callable[[], None] | None = None
+    on_check_complete: Callable[[Any, CheckResult], None] | None = None
+    # v2.1 additions
+    on_refresh_started: Callable[[], None] | None = None
+    on_refresh_completed: Callable[[int], None] | None = None  # proxies_added
+    on_warmup_started: Callable[[], None] | None = None
+    on_warmup_completed: Callable[[int, int], None] | None = None  # ready_count, total
+    on_circuit_open: Callable[[], None] | None = None
+    on_circuit_close: Callable[[], None] | None = None
+    on_auto_evicted: Callable[[Any, str], None] | None = None  # proxy, reason
+    on_session_rebind: Callable[[str, Any, Any], None] | None = None  # session_id, old, new
+    on_draining: Callable[[], None] | None = None
+    on_config_updated: Callable[[set[str]], None] | None = None
 
 
 @dataclass(slots=True)
 class PoolConfig:
-    """Centralised knobs for :class:`~omniproxy.pool.ProxyPool` selection, limits, and lifecycle hooks.
+    strategy: PoolStrategy = PoolStrategy.ROUND_ROBIN
+    structure: PoolStructure = PoolStructure.DEQUE  # automatically adjusted if needed
+    acquire_timeout: float = 0.0
+    wait_fallback_interval: float = 0.25
 
-    Related options are grouped on :attr:`limits` and :attr:`hooks`; defaults favour round-robin over
-    a :class:`collections.deque` with a fixed cooldown after repeated failures. Pair with
-    :class:`HealthCheckConfig` for background probes.
-
-    Attributes
-    ----------
-    strategy
-        ``round_robin`` (fair rotation) or ``random`` (uniform random among eligible proxies).
-        ``random`` forces ``structure='list'`` inside :meth:`ProxyPool.__init__`.
-    structure
-        ``deque`` (efficient popleft/append for round-robin) or ``list`` (required for ``random``).
-    cooldown: :class:`float`
-        Base seconds a proxy spends off the active list after ``failure_threshold`` failures.
-        Actual duration may be scaled by :attr:`failure_penalties` per exception type.
-    failure_penalties: :class:`dict` [:class:`type`, :class:`float`]
-        Maps exception **types** to multipliers applied to :attr:`cooldown` when that type caused
-        :meth:`~omniproxy.pool.ProxyPool.mark_failed`.
-    limits: :class:`LimitsConfig`
-        :attr:`LimitsConfig.max_connections_per_proxy` and :attr:`LimitsConfig.max_rps_per_proxy`.
-    hooks: :class:`LifecycleHooks`
-        All ``on_*`` callbacks (saturation, exhaustion, acquisition, health, failure / recovery).
-    filter_missing_metadata
-        ``skip`` (exclude proxy), ``raise`` (:exc:`~omniproxy.errors.MissingProxyMetadata`), or ``include`` when metadata needed by filters is absent.
-    refresh_callback
-        Optional callable returning ``list`` of :class:`~omniproxy.extended_proxy.Proxy` or ``str``
-        to merge when the pool is exhausted synchronously.
-    arefresh_callback: Optional[Callable[[], Awaitable[list]]]
-        Async variant of :attr:`refresh_callback`.
-    refresh_timeout: :class:`float`
-        Seconds :meth:`~omniproxy.pool.ProxyPool.get_next` / :meth:`~omniproxy.pool.ProxyPool.aget_next` wait for an in-flight refresh event.
-    auto_mark_failed_on_exception: :class:`bool`
-        If ``True``, sync/async ``with`` blocks call :meth:`~omniproxy.pool.ProxyPool.mark_failed` when the body raises.
-    auto_mark_success_on_exit: :class:`bool`
-        If ``True``, clean exit from ``with`` calls :meth:`~omniproxy.pool.ProxyPool.mark_success`.
-    reraise: :class:`bool`
-        If ``True`` (default), context managers swallow internally but the original exception still propagates.
-    failure_threshold: :class:`int`
-        Number of :meth:`~omniproxy.pool.ProxyPool.mark_failed` calls before a proxy is cooled down.
-    extra: :class:`dict` [:class:`str`, :class:`Any`]
-        Reserved extension bag for forward-compatible options.
-    health_check: Optional[:class:`HealthCheckConfig`]
-        When set, enables :meth:`~omniproxy.pool.ProxyPool.start_monitoring` / threaded monitoring.
-    """
-
-    strategy: Strategy = "round_robin"
-    """Proxy selection strategy."""
-
-    structure: Structure = "deque"
-    """Underlying data structure used to hold active proxies.
-    'deque' is optimal for round-robin; 'list' is required for random strategy."""
-
-    cooldown: float = 60.0
-    """Seconds a proxy is blacklisted after being marked failed."""
-
+    cooldown: float = 300.0  # base_cooldown in spec
+    adaptive_cooldown: bool = True
+    min_cooldown: float = 30.0
+    max_cooldown: float = 600.0
+    cooldown_strategy: Callable[[float, int, int], float] | None = (
+        None  # base, active, total -> secs
+    )
+    failure_threshold: int = 1  # number of mark_failed before cooldown
     failure_penalties: dict[type, float] = field(default_factory=dict)
-    """Multiply cooldown duration by ``failure_penalties.get(exc_type, 1.0)`` when marking failed."""
 
     limits: LimitsConfig = field(default_factory=LimitsConfig)
-    """Per-proxy connection and RPS caps (see :class:`LimitsConfig`)."""
-
     hooks: LifecycleHooks = field(default_factory=LifecycleHooks)
-    """Lifecycle callbacks (see :class:`LifecycleHooks`)."""
 
-    filter_missing_metadata: Literal["skip", "raise", "include"] = "skip"
-    """How to treat proxies missing metadata required by a filter (e.g. ``min_anonymity``)."""
+    filter_missing_metadata: FilterMissingMetadata = FilterMissingMetadata.SKIP
 
-    refresh_callback: Callable[[], list[Proxy | str]] | None = None
-    """Sync callback returning new proxies to merge when the pool is exhausted."""
-
-    arefresh_callback: Callable[[], Awaitable[list[Proxy | str]]] | None = None
-    """Async callback returning new proxies to merge when the pool is exhausted."""
-
+    refresh_callback: Callable[[], list[Any]] | None = None  # list[Proxy|str]
+    arefresh_callback: Callable[[], Awaitable[list[Any]]] | None = None
+    fallback_refresh_callbacks: list[Callable[[], list[Any]]] = field(default_factory=list)
+    afallback_refresh_callbacks: list[Callable[[], Awaitable[list[Any]]]] = field(
+        default_factory=list
+    )
     refresh_timeout: float = 10.0
-    """Max seconds to wait for an in-flight refresh before failing with :exc:`PoolExhausted`."""
 
-    wait_fallback_interval: float = 0.25
-    """Seconds to sleep on a coordination :class:`threading.Condition` wait when no cooldown deadline applies."""
-
-    acquire_timeout: float = 0.0
-    """Total seconds to retry :exc:`PoolSaturated` acquisition before re-raising. ``0`` disables waiting."""
-
-    # --- context-manager behaviour ---
     auto_mark_failed_on_exception: bool = True
-    """If True, context managers call ``mark_failed`` when the block raises an exception."""
-
     auto_mark_success_on_exit: bool = False
-    """If True, context managers call ``mark_success`` on clean exit."""
-
     reraise: bool = True
-    """If True, exceptions from inside the context block are re-raised after accounting."""
 
-    # --- failure threshold ---
-    failure_threshold: int = 1
-    """Number of ``mark_failed`` calls before a proxy is cooled down."""
+    # v2.1 additions
+    warmup: bool = False
+    min_ready: int = 0
+    warmup_timeout: float = 30.0
+    warmup_failure_policy: WarmupFailurePolicy = WarmupFailurePolicy.RAISE
 
-    # --- extra fields reserved for future use ---
-    extra: dict[str, Any] = field(default_factory=dict)
+    scoring: ScoringConfig | None = None  # None disables scoring & eviction
+    circuit_breaker: CircuitBreakerConfig | None = None
+    dedup_key: Callable[[Any], str] | None = None  # default canonical URL
 
+    session_ttl: float = 300.0
+    session_cooldown_policy: SessionCooldownPolicy = SessionCooldownPolicy.REBIND
+
+    dead_letter_max_size: int = 1000
+    ignore_exceptions: tuple[type, ...] = ()
+    proxy_failure_classifier: Callable[[BaseException, Any | None], bool] | None = None
+
+    rotate_on_acquire: bool = False
+    rotate_on_failure: bool = False
+
+    metrics_exporter: MetricsExporter | None = None
+    log_level: int = logging.INFO
+
+    state_store_factory: Callable[[], StateStore] | None = None
+
+    extra: dict[str, Any] = field(default_factory=dict)  # forward compat
     health_check: HealthCheckConfig | None = None
-    """Health check configuration."""
+
+    # v2.1: Presets
+    @classmethod
+    def scraping_preset(cls) -> PoolConfig:
+        return cls(
+            strategy=PoolStrategy.ROUND_ROBIN,
+            cooldown=120.0,
+            adaptive_cooldown=True,
+            min_cooldown=15.0,
+            max_cooldown=300.0,
+            failure_threshold=2,
+            failure_penalties={ConnectionError: 2.0, TimeoutError: 1.5},
+            acquire_timeout=10.0,
+            wait_fallback_interval=0.5,
+            limits=LimitsConfig(
+                max_connections_per_proxy=50, max_rps_per_proxy=5.0, token_bucket_capacity=2.0
+            ),
+            scoring=ScoringConfig(
+                window_seconds=120.0, eviction_threshold=0.15, eviction_grace_period=30.0
+            ),
+            circuit_breaker=CircuitBreakerConfig(
+                failure_ratio=0.6, half_open_timeout=15.0, min_throughput=20
+            ),
+            session_cooldown_policy=SessionCooldownPolicy.REBIND,
+            warmup=False,
+            auto_mark_failed_on_exception=True,
+            auto_mark_success_on_exit=True,
+            filter_missing_metadata=FilterMissingMetadata.SKIP,
+            log_level=logging.WARNING,
+        )
+
+    @classmethod
+    def api_gateway_preset(cls) -> PoolConfig:
+        return cls(
+            strategy=PoolStrategy.WEIGHTED,
+            cooldown=600.0,
+            adaptive_cooldown=True,
+            min_cooldown=120.0,
+            max_cooldown=1800.0,
+            failure_threshold=5,
+            acquire_timeout=30.0,
+            limits=LimitsConfig(
+                max_connections_per_proxy=5, max_rps_per_proxy=1.0, token_bucket_capacity=1.0
+            ),
+            scoring=ScoringConfig(
+                window_seconds=600.0, eviction_threshold=0.1, eviction_grace_period=300.0
+            ),
+            circuit_breaker=CircuitBreakerConfig(
+                failure_ratio=0.4, half_open_timeout=60.0, min_throughput=5
+            ),
+            session_cooldown_policy=SessionCooldownPolicy.BLOCK,
+            warmup=True,
+            min_ready=1,
+            warmup_timeout=15.0,
+            warmup_failure_policy=WarmupFailurePolicy.PARTIAL,
+            auto_mark_failed_on_exception=True,
+            auto_mark_success_on_exit=True,
+            filter_missing_metadata=FilterMissingMetadata.RAISE,
+            log_level=logging.INFO,
+            health_check=HealthCheckConfig(),
+        )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.strategy, PoolStrategy):
+            self.strategy = PoolStrategy(self.strategy)
+        if not isinstance(self.structure, PoolStructure):
+            self.structure = PoolStructure(self.structure)
+        if not isinstance(self.filter_missing_metadata, FilterMissingMetadata):
+            self.filter_missing_metadata = FilterMissingMetadata(self.filter_missing_metadata)
+        if not isinstance(self.warmup_failure_policy, WarmupFailurePolicy):
+            self.warmup_failure_policy = WarmupFailurePolicy(self.warmup_failure_policy)
+        if not isinstance(self.session_cooldown_policy, SessionCooldownPolicy):
+            self.session_cooldown_policy = SessionCooldownPolicy(self.session_cooldown_policy)
+
+        # Validate that scoring weights sum to 1 if scoring enabled
+        if (
+            self.scoring is not None
+            and abs(self.scoring.success_weight + self.scoring.latency_weight - 1.0) > 1e-9
+        ):
+            raise ValueError("scoring.success_weight + scoring.latency_weight must equal 1.0")
+        if self.warmup and self.health_check is None:
+            raise ValueError("health_check must be provided when warmup=True")
+        if self.min_cooldown > self.max_cooldown:
+            raise ValueError("min_cooldown cannot exceed max_cooldown")
+        if self.circuit_breaker is not None:
+            cb = self.circuit_breaker
+            if cb.failure_ratio <= 0 or cb.failure_ratio >= 1:
+                raise ValueError("circuit_breaker.failure_ratio must be between 0 and 1 exclusive")
+            if cb.half_open_timeout <= 0:
+                raise ValueError("circuit_breaker.half_open_timeout must be >0")
+        # strategy "weighted" requires scoring config
+        if self.strategy == PoolStrategy.WEIGHTED and self.scoring is None:
+            import warnings
+
+            warnings.warn(
+                "strategy='weighted' is selected but scoring config is None; scoring will be enabled with defaults.",
+                stacklevel=2,
+            )
+            self.scoring = ScoringConfig()
 
 
 class OmniproxyConfig:
@@ -425,8 +479,8 @@ class OmniproxyConfig:
             True
         """
         if name in OMNIPROXY_CONFIG_PUBLIC_KEYS:
-            # with self._lock:
-            return self._data[name]
+            with self._lock:
+                return self._data[name]
         raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -486,10 +540,18 @@ settings = OmniproxyConfig()
 
 
 __all__ = [
+    "FilterMissingMetadata",
     "HealthCheckConfig",
+    "HealthStrategy",
     "LifecycleHooks",
     "LimitsConfig",
     "OmniproxyConfig",
     "PoolConfig",
+    "PoolStrategy",
+    "PoolStructure",
+    "SessionCooldownPolicy",
+    "Strategy",
+    "Structure",
+    "WarmupFailurePolicy",
     "settings",
 ]

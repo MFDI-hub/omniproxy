@@ -1,4 +1,4 @@
-"""``acheck_proxy`` status handling; backend is mocked (no live traffic to ``PROXIES``)."""
+"""``acheck_proxy`` status handling; backend is mocked (no live traffic to ``PROXY_LIST``)."""
 
 import asyncio
 import unittest

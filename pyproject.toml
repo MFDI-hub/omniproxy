@@ -73,10 +73,20 @@ dev = [
     "pydantic>=2.10",
     "python-dotenv>=1.0.0",
     "pytest>=8.0",
+    "pytest-asyncio>=0.24",
     "ruff>=0.4",
     "mkdocs-material>=9.7.6",
     "mkdocstrings[python]>=1.0.3",
     "ty>=0.0.29",
+]
+
+profiling = [
+    "snakeviz>=2.0",
+    "py-spy>=0.4",
+    "line_profiler>=4.0",
+    "yappi>=1.6",
+    "memory-profiler>=0.61",
+    "objgraph>=3.6",
 ]
 
 [project.urls]
@@ -160,6 +170,10 @@ allowed-unresolved-imports = [
 minversion = "8.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that need network env (e.g. PROXY_LIST, TOKEN)",
+]
 filterwarnings = [
     "error",
 ]

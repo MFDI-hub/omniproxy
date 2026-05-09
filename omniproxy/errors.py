@@ -91,3 +91,23 @@ class PoolClosedError(RuntimeError):
     args: :class:`tuple`
         Human-readable reason (typically ``"proxy pool is closed"``).
     """
+
+
+class PoolDrainingError(ProxyPoolError):
+    """Raised when a pool is draining and rejects new acquisitions."""
+
+
+class SessionBrokenError(ProxyPoolError):
+    """Raised when a sticky session binding is invalid or the bound proxy is unusable."""
+
+
+class WarmupFailedError(ProxyPoolError):
+    """Raised when pool warmup cannot satisfy :attr:`~omniproxy.config.PoolConfig.min_ready`."""
+
+
+class ConfigurationError(OmniproxyError):
+    """Invalid pool or package configuration."""
+
+
+class PoolCircuitOpenError(ProxyPoolError):
+    """Raised when the pool-level circuit breaker is open and probes are disallowed."""

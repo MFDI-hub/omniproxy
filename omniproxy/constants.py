@@ -5,14 +5,10 @@ from __future__ import annotations
 import re
 from typing import Literal
 
+from .enum import AnonymityTier, HttpBackend
+
 # --- HTTP backends ---
-SUPPORTED_BACKENDS: tuple[str, ...] = (
-    "httpx",
-    "aiohttp",
-    "requests",
-    "curl_cffi",
-    "tls_client",
-)
+SUPPORTED_BACKENDS: tuple[str, ...] = tuple(b.value for b in HttpBackend)
 VALID_BACKENDS: frozenset[str] = frozenset(SUPPORTED_BACKENDS)
 
 # --- OmniproxyConfig (see config.OmniproxyConfig) ---
@@ -41,7 +37,11 @@ DEFAULT_CHECK_MAX_RETRIES: int = 0
 DEFAULT_CHECK_RETRY_BACKOFF: float = 0.5
 
 # --- Pool ---
-ANONYMITY_RANKS: dict[str, int] = {"transparent": 1, "anonymous": 2, "elite": 3}
+ANONYMITY_RANKS: dict[str, int] = {
+    AnonymityTier.TRANSPARENT.value: 1,
+    AnonymityTier.ANONYMOUS.value: 2,
+    AnonymityTier.ELITE.value: 3,
+}
 
 # --- Protocol typing & parsing (OmniproxyParser) ---
 ALLOWED_PROTOCOLS = Literal["http", "https", "socks5", "socks4"]
