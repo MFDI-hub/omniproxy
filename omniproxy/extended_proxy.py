@@ -859,12 +859,13 @@ def run_health_check(
 
     url = _resolve_health_check_url(hc.url)
 
+    ef = set(hc.expected_json_fields.keys()) if hc.expected_json_fields else None
     p, result = check_proxy(
         proxy,
         url=url,
         with_info=False,
         expected_status=hc.expected_status,
-        expected_fields=hc.expected_fields,
+        expected_fields=ef,
         backend=backend,
         timeout=hc.timeout,
         headers=hc.headers or None,
@@ -902,18 +903,46 @@ async def arun_health_check(
 
     url = _resolve_health_check_url(hc.url)
 
+    ef = set(hc.expected_json_fields.keys()) if hc.expected_json_fields else None
     p, result = await acheck_proxy(
         proxy,
         url=url,
         with_info=False,
         expected_status=hc.expected_status,
-        expected_fields=hc.expected_fields,
+        expected_fields=ef,
         backend=backend,
         timeout=hc.timeout,
         headers=hc.headers or None,
     )
 
     return cast(tuple[Proxy, CheckResult], (p, result))
+
+
+def _rebuild_models_with_forward_proxy_refs() -> None:
+    """Resolve ``Proxy`` inside Pydantic callables (:class:`~omniproxy.config.LimitsConfig`, etc.)."""
+    from .config import (
+        HealthCheckConfig,
+        LifecycleHooks,
+        LimitsConfig,
+        PoolConfig,
+        RefreshConfig,
+        WarmupConfig,
+    )
+
+    ns: dict[str, Any] = {"Proxy": Proxy, "CheckResult": CheckResult}
+    for _cls in (
+        LimitsConfig,
+        HealthCheckConfig,
+        LifecycleHooks,
+        WarmupConfig,
+        RefreshConfig,
+    ):
+        _cls.model_rebuild(_types_namespace=ns)
+
+    PoolConfig.model_rebuild(_types_namespace=ns)
+
+
+_rebuild_models_with_forward_proxy_refs()
 
 
 __all__ = [

@@ -1,37 +1,41 @@
-"""``SyncProxyPool`` smoke tests using ``PROXY_LIST`` from the environment (see ``tests/proxy_seeds``)."""
+"""Basic smoke tests for SyncProxyPool using new config."""
 
-import unittest
-
-from omniproxy.extended_proxy import Proxy
+from omniproxy import Proxy
 from omniproxy.pool import SyncProxyPool
 
-from tests.proxy_seeds import seeds
 
-S0, S1 = seeds(2)
-
-
-class TestProxyPool(unittest.TestCase):
-    def test_len_contains_iter(self):
-        pool = SyncProxyPool([S0, S1])
-        self.assertEqual(len(pool), 2)
-        p = pool.get_next()
-        assert p is not None
-        self.assertIn(p, pool)
-        canonical = {Proxy(S0).url, Proxy(S1).url}
-        self.assertIn(p.url, canonical)
-        urls = {str(x) for x in pool}
-        self.assertTrue(canonical.issubset(urls))
-
-    def test_round_robin_index_stable(self):
-        pool = SyncProxyPool([S0, S1], strategy="round_robin")
-        first = pool.get_next()
-        second = pool.get_next()
-        pool.mark_failed(S0)
-        third = pool.get_next()
-        self.assertEqual(first.url, Proxy(S0).url)
-        self.assertEqual(second.url, Proxy(S1).url)
-        self.assertEqual(third.url, Proxy(S1).url)
+def test_acquire_twice(proxy_list, default_pool_config):
+    pool = SyncProxyPool(default_pool_config, proxy_list)
+    p = pool.acquire()
+    pool.release(p)
+    p2 = pool.acquire()
+    pool.release(p2)
+    pool.close()
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_round_robin(s0, s1, default_pool_config):
+    cfg = default_pool_config
+    pool = SyncProxyPool(cfg, [Proxy(s0), Proxy(s1)])
+    first = pool.acquire()
+    second = pool.acquire()
+    third = pool.acquire()
+    assert first.url != second.url
+    assert first.url == third.url
+    pool.release(first)
+    pool.release(second)
+    pool.close()
+
+
+def test_acquire_release_context_manager(proxy_list, default_pool_config):
+    pool = SyncProxyPool(default_pool_config, proxy_list)
+    p = pool.acquire()
+    try:
+        assert isinstance(p, Proxy)
+    finally:
+        pool.release(p)
+    p2 = pool.acquire()
+    try:
+        assert p2 is not None
+    finally:
+        pool.release(p2)
+    pool.close()

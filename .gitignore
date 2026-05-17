@@ -177,9 +177,7 @@ cache/
 
 # Custom projects
 
-rust/
-scripts/
 testingoutsmth.py
 *.txt
 *.json
-profiling/
+_*/

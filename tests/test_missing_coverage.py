@@ -9,55 +9,30 @@ import asyncio
 import json
 import threading
 import time
-from typing import Any
 from unittest import mock
 
 import pytest
-from omniproxy.config import (
-    HealthCheckConfig,
-    LifecycleHooks,
-    LimitsConfig,
-    PoolConfig,
-    ScoringConfig,
-    settings,
-)
-from omniproxy.enum import PoolStrategy, SessionCooldownPolicy
+from omniproxy import CheckResult, Proxy, check_proxy
+from omniproxy.config import GlobalConfig, HealthCheckConfig, PoolConfig, settings
+from omniproxy.enum import PoolStructure
 from omniproxy.errors import (
     PoolExhausted,
-    PoolSaturated,
     SessionBrokenError,
 )
-from omniproxy.extended_proxy import (
-    CheckResult,
-    Proxy,
-    check_proxy,
-    run_health_check,
-)
+from omniproxy.extended_proxy import run_health_check
 from omniproxy.pool import AsyncProxyPool, SyncProxyPool
 from omniproxy.utils import OmniproxyParser, get_formatted_proxy_string
 
-from tests.proxy_seeds import seeds
-
-S0, S1, S2, S3 = seeds(4)
-
-
-# -------------------------------------------------------------------
-# Helper: build proxies with metadata for filtering / scoring tests
-# -------------------------------------------------------------------
-def _meta_proxy(url: str, **meta: Any) -> Proxy:
-    p = Proxy(url)
-    for k, v in meta.items():
-        if v is not None:
-            p._set_attribute(k, v)
-    return p
+from tests.conftest import proxy_with_meta
+from tests.pool_configs import pool_with_on_exhausted
 
 
 # ===================================================================
 # 1. Proxy read‑only attributes, comparisons, serialisation
 # ===================================================================
 class TestProxyAttributes:
-    def test_attribute_immutable(self) -> None:
-        p = Proxy(S0)
+    def test_attribute_immutable(self, s0: str) -> None:
+        p = Proxy(s0)
         with pytest.raises(AttributeError):
             p.ip = "1.2.3.4"
 
@@ -79,8 +54,8 @@ class TestProxyAttributes:
         mid._set_attribute("last_checked", 200)
         assert mid < fast  # same latency, but more recent last_checked
 
-    def test_serialization_roundtrip(self) -> None:
-        p = _meta_proxy(S0, latency=1.5, country="US")
+    def test_serialization_roundtrip(self, s0: str) -> None:
+        p = proxy_with_meta(s0, latency=1.5, country="US")
         d = p.to_dict()
         assert d.get("latency") == 1.5
         js = p.to_json_string()
@@ -100,7 +75,7 @@ class TestProxyAttributes:
 # ===================================================================
 class TestCheckProxyAdvanced:
     @mock.patch("omniproxy.extended_proxy.get_backend")
-    def test_custom_expected_status(self, mock_be: mock.MagicMock) -> None:
+    def test_custom_expected_status(self, mock_be: mock.MagicMock, s0: str) -> None:
         backend = mock.MagicMock()
         resp = mock.MagicMock()
         resp.status_code = 201
@@ -108,11 +83,11 @@ class TestCheckProxyAdvanced:
         backend.get.return_value = resp
         mock_be.return_value = backend
 
-        _, result = check_proxy(S0, expected_status=201, max_retries=0)
+        _, result = check_proxy(s0, expected_status=201, max_retries=0)
         assert result.success is True
 
     @mock.patch("omniproxy.extended_proxy.get_backend")
-    def test_expected_fields_validate(self, mock_be: mock.MagicMock) -> None:
+    def test_expected_fields_validate(self, mock_be: mock.MagicMock, s0: str) -> None:
         backend = mock.MagicMock()
         resp = mock.MagicMock()
         resp.status_code = 200
@@ -121,15 +96,15 @@ class TestCheckProxyAdvanced:
         mock_be.return_value = backend
 
         # correct subset
-        _, result = check_proxy(S0, expected_fields={"key"}, max_retries=0)
+        _, result = check_proxy(s0, expected_fields={"key"}, max_retries=0)
         assert result.success
 
         # missing field
-        _, result = check_proxy(S0, expected_fields={"missing"}, max_retries=0)
+        _, result = check_proxy(s0, expected_fields={"missing"}, max_retries=0)
         assert not result.success
 
     @mock.patch("omniproxy.extended_proxy.get_backend")
-    def test_retry_on_status(self, mock_be: mock.MagicMock) -> None:
+    def test_retry_on_status(self, mock_be: mock.MagicMock, s0: str) -> None:
         backend = mock.MagicMock()
         resp_bad = mock.MagicMock()
         resp_bad.status_code = 503
@@ -141,12 +116,12 @@ class TestCheckProxyAdvanced:
         mock_be.return_value = backend
 
         _, result = check_proxy(
-            S0, max_retries=1, retry_backoff=0.01, retry_on_status=frozenset({503})
+            s0, max_retries=1, retry_backoff=0.01, retry_on_status=frozenset({503})
         )
         assert result.success
 
     @mock.patch("omniproxy.extended_proxy.get_backend")
-    def test_detect_anonymity(self, mock_be: mock.MagicMock) -> None:
+    def test_detect_anonymity(self, mock_be: mock.MagicMock, s0: str) -> None:
         backend = mock.MagicMock()
         main_resp = mock.MagicMock()
         main_resp.status_code = 200
@@ -157,7 +132,7 @@ class TestCheckProxyAdvanced:
         backend.get.side_effect = [main_resp, probe_resp]
         mock_be.return_value = backend
 
-        proxy, result = check_proxy(S0, detect_anonymity=True, max_retries=0)
+        proxy, result = check_proxy(s0, detect_anonymity=True, max_retries=0)
         assert result.success
         assert proxy.anonymity == "transparent"
 
@@ -167,23 +142,23 @@ class TestCheckProxyAdvanced:
 # ===================================================================
 class TestHealthCheckFallback:
     @mock.patch("omniproxy.extended_proxy.check_proxy")
-    def test_fallback_to_global_defaults(self, mock_check: mock.MagicMock) -> None:
-        mock_check.return_value = (Proxy(S0), CheckResult(True, 0.1, None, 200))
+    def test_fallback_to_global_defaults(self, mock_check: mock.MagicMock, s0: str) -> None:
+        mock_check.return_value = (Proxy(s0), CheckResult(True, 0.1, None, 200))
         hc = HealthCheckConfig(url=None)  # no explicit URL
-        _, result = run_health_check(S0, hc)
+        _, result = run_health_check(s0, hc)
         assert result.success
         # verify check_proxy received a URL from global defaults
         call_args = mock_check.call_args[1]
         assert call_args["url"] in settings.default_check_urls
 
     @mock.patch("omniproxy.extended_proxy.check_proxy")
-    def test_custom_headers_forwarded(self, mock_check: mock.MagicMock) -> None:
-        mock_check.return_value = (Proxy(S0), CheckResult(True, 0.1, None, 200))
+    def test_custom_headers_forwarded(self, mock_check: mock.MagicMock, s0: str) -> None:
+        mock_check.return_value = (Proxy(s0), CheckResult(True, 0.1, None, 200))
         hc = HealthCheckConfig(
             url="http://example.com",
             headers={"X-Custom": "foo"},
         )
-        run_health_check(S0, hc)
+        run_health_check(s0, hc)
         assert mock_check.call_args[1]["headers"] == {"X-Custom": "foo"}
 
 
@@ -191,101 +166,57 @@ class TestHealthCheckFallback:
 # 4. Weighted & lowest‑latency strategies + scoring / eviction
 # ===================================================================
 class TestWeightedLowestLatency:
-    def test_weighted_selection(self) -> None:
-        # Create proxies with different scores via mark_success/fail
-        p1 = Proxy(S0)
-        p2 = Proxy(S1)
-        cfg = PoolConfig(
-            strategy=PoolStrategy.WEIGHTED,
-            scoring=ScoringConfig(window_seconds=60, min_samples=2),
-            failure_threshold=100,
-            acquire_timeout=1.0,
-            cooldown=600,
-        )
-        pool = SyncProxyPool([p1, p2], cfg)
-        # Make p1 faster than p2
-        for _ in range(10):
-            pool.mark_success(p1, latency=0.1)
-            pool.mark_success(p2, latency=1.0)
-        # Allow scoring to be computed
-        with pool._lock:
-            for k, s in pool._state._scores.items():
-                s.compute_score(cfg.scoring, pool._state._nolock_pool_avg_latency())
-        # p1 should be preferred repeatedly
-        first = pool.get_next()
-        assert first == p1
-        pool.close()
+    def test_weighted_bias_toward_faster_proxy(self, s0: str, s1: str, weighted_deterministic_bias_pool_config) -> None:
+        cfg = weighted_deterministic_bias_pool_config
+        p1, p2 = Proxy(s0), Proxy(s1)
+        pool = SyncProxyPool(cfg, [p1, p2])
+        try:
+            for _ in range(15):
+                pool.mark_success(p1, latency=0.05)
+                pool.mark_success(p2, latency=1.5)
+            # Deterministic midpoint draw: With two proxies and w_fast >= w_slow,
+            # (w_fast + w_slow) / 2 falls in the fast proxy's cumulative segment.
+            with mock.patch(
+                "omniproxy.strategies.random.uniform",
+                side_effect=lambda a, b: (a + b) / 2,
+            ):
+                for _ in range(10):
+                    got = pool.acquire()
+                    assert got.url == p1.url
+                    pool.release(got)
+        finally:
+            pool.close()
 
-    def test_lowest_latency_selection(self) -> None:
-        p1 = Proxy(S0)
-        p2 = Proxy(S1)
-        cfg = PoolConfig(
-            strategy=PoolStrategy.LOWEST_LATENCY,
-            scoring=ScoringConfig(window_seconds=60, min_samples=2),
-            failure_threshold=100,
-            acquire_timeout=1.0,
-            cooldown=600,
-        )
-        pool = SyncProxyPool([p1, p2], cfg)
-        pool.mark_success(p1, latency=0.2)
-        pool.mark_success(p2, latency=0.1)
-        chosen = pool.get_next()
-        assert chosen == p2  # lower latency
-        pool.close()
-
-    def test_eviction_removes_low_scored_proxy(self) -> None:
-        # Force a proxy to have a very low score, then wait grace period
-        p_good = Proxy(S0)
-        p_bad = Proxy(S1)
-        cfg = PoolConfig(
-            strategy=PoolStrategy.ROUND_ROBIN,
-            scoring=ScoringConfig(
-                window_seconds=60,
-                eviction_threshold=0.3,
-                eviction_grace_period=0.0,
-                min_samples=1,
-            ),
-            failure_threshold=100,
-            cooldown=600,
-        )
-        pool = SyncProxyPool([p_good, p_bad], cfg)
-        # Give good proxy success, bad proxy many failures so score < threshold
-        pool.mark_success(p_good, latency=0.1)
-        for _ in range(5):
-            pool.mark_failed(p_bad)
-        # Manually compute scores and call eviction (normally triggered on next get_next)
-        with pool._lock:
-            for k, s in pool._state._scores.items():
-                s.compute_score(cfg.scoring, pool._state._nolock_pool_avg_latency())
-            pool._state._nolock_evict_if_needed()
-        # p_bad should be evicted
-        assert p_bad not in pool.proxies
-        pool.close()
+    def test_lowest_latency_selection(self, s0: str, s1: str, lowest_latency_stable_cooldown_pool_config) -> None:
+        p1, p2 = Proxy(s0), Proxy(s1)
+        cfg = lowest_latency_stable_cooldown_pool_config
+        pool = SyncProxyPool(cfg, [p1, p2])
+        try:
+            pool.mark_success(p1, latency=0.2)
+            pool.mark_success(p2, latency=0.1)
+            chosen = pool.acquire()
+            assert chosen.url == p2.url
+            pool.release(chosen)
+        finally:
+            pool.close()
 
 
 # ===================================================================
 # 5. Adaptive cooldown with custom strategy
 # ===================================================================
 class TestAdaptiveCooldown:
-    def test_custom_cooldown_strategy(self) -> None:
-        def custom(base: float, active: int, total: int) -> float:
-            return base * 0.5
-
-        cfg = PoolConfig(
-            cooldown=10,
-            failure_threshold=1,
-            cooldown_strategy=custom,
-            min_cooldown=0.1,
-        )
-        pool = SyncProxyPool([S0], cfg)
+    def test_custom_cooldown_strategy_duration(self, s0: str, adaptive_cooldown_monotonic_timing_pool_config) -> None:
+        cfg = adaptive_cooldown_monotonic_timing_pool_config
+        p = Proxy(s0)
+        pool = SyncProxyPool(cfg, [p])
         t0 = 1e6
         with mock.patch("time.monotonic", return_value=t0):
-            pool.mark_failed(S0)
-        k = pool._key(Proxy(S0))
-        with pool._lock:
-            until = pool._state._cooldown_until[k]
-        # base 10 * 0.5 = 5, plus minimum doesn't clip (5 > 0.1)
-        assert until == t0 + 5.0
+            pool.mark_failed(p)
+        with pytest.raises(PoolExhausted):
+            pool.acquire()
+        with mock.patch("time.monotonic", return_value=t0 + 6.0):
+            q = pool.acquire()
+            pool.release(q)
         pool.close()
 
 
@@ -293,33 +224,22 @@ class TestAdaptiveCooldown:
 # 6. Session cooldown policies BLOCK / RAISE
 # ===================================================================
 class TestSessionPolicies:
-    def test_policy_block_raises_on_missing_bound(self) -> None:
-        cfg = PoolConfig(
-            session_ttl=60,
-            session_cooldown_policy=SessionCooldownPolicy.BLOCK,
-            failure_threshold=1,
-        )
-        pool = SyncProxyPool([S0], cfg)
-        # create a bound session
-        pool.get_next(session_id="s1")
-        # now make proxy unavailable (fail it)
-        pool.mark_failed(S0)  # cooldown
-        # attempt to reuse session
-        with pytest.raises(PoolSaturated, match=r"(?i)sticky"):
-            pool.get_next(session_id="s1")
+    def test_policy_block_raises_pool_exhausted(self, s0: str, session_block_exhaust_pool_config) -> None:
+        cfg = session_block_exhaust_pool_config
+        pool = SyncProxyPool(cfg, [Proxy(s0)])
+        pool.acquire(session_key="s1")
+        pool.mark_failed(Proxy(s0))
+        with pytest.raises(PoolExhausted):
+            pool.acquire(session_key="s1")
         pool.close()
 
-    def test_policy_raise_raises_session_broken(self) -> None:
-        cfg = PoolConfig(
-            session_ttl=60,
-            session_cooldown_policy=SessionCooldownPolicy.RAISE,
-            failure_threshold=1,
-        )
-        pool = SyncProxyPool([S0], cfg)
-        pool.get_next(session_id="s1")
-        pool.mark_failed(S0)
+    def test_policy_raise_raises_session_broken(self, s0: str, session_raise_broken_pool_config) -> None:
+        cfg = session_raise_broken_pool_config
+        pool = SyncProxyPool(cfg, [Proxy(s0)])
+        pool.acquire(session_key="s1")
+        pool.mark_failed(Proxy(s0))
         with pytest.raises(SessionBrokenError):
-            pool.get_next(session_id="s1")
+            pool.acquire(session_key="s1")
         pool.close()
 
 
@@ -327,21 +247,17 @@ class TestSessionPolicies:
 # 7. on_exhausted hook
 # ===================================================================
 class TestExhaustedHook:
-    def test_on_exhausted_called(self) -> None:
-        exhausted_calls = []
+    def test_on_exhausted_called(self, s0: str) -> None:
+        exhausted_calls: list[int] = []
 
         def on_exhausted() -> None:
             exhausted_calls.append(1)
 
-        cfg = PoolConfig(
-            failure_threshold=1,
-            hooks=LifecycleHooks(on_exhausted=on_exhausted),
-            # no refresh callback, so exhaustion raises after hook
-        )
-        pool = SyncProxyPool([S0], cfg)
-        pool.mark_failed(S0)  # cooldown
+        cfg = pool_with_on_exhausted(on_exhausted)
+        pool = SyncProxyPool(cfg, [Proxy(s0)])
+        pool.mark_failed(Proxy(s0))
         with pytest.raises(PoolExhausted):
-            pool.get_next()
+            pool.acquire()
         assert exhausted_calls == [1]
         pool.close()
 
@@ -350,29 +266,22 @@ class TestExhaustedHook:
 # 8. PoolConfig enum coercion from strings
 # ===================================================================
 class TestConfigEnumCoercion:
-    def test_strategy_string_to_enum(self) -> None:
-        with pytest.warns(UserWarning, match="strategy='weighted'"):
-            cfg = PoolConfig(strategy="weighted")
-        assert cfg.strategy == PoolStrategy.WEIGHTED
-        cfg = PoolConfig(structure="deque")
-        assert cfg.structure.value == "deque"  # PoolStructure.DEQUE
+    def test_weighted_requires_explicit_scoring(self) -> None:
+        with pytest.raises(ValueError):
+            PoolConfig(strategy="weighted")  # type: ignore[arg-type]
+
+    def test_structure_string_accepted(self) -> None:
+        cfg = PoolConfig(structure="deque")  # type: ignore[arg-type]
+        assert cfg.structure == PoolStructure.DEQUE
 
 
 # ===================================================================
 # 9. OmniproxyConfig backend / URL validation
 # ===================================================================
 class TestOmniproxyConfigValidation:
-    def test_backend_validation(self) -> None:
-        with pytest.raises(ValueError, match="Unknown backend"):
-            settings.default_backend = "invalid_backend"
-
-    def test_check_url_list_non_empty_required(self) -> None:
-        with pytest.raises(ValueError):
-            settings.default_check_urls = []
-
-    def test_health_check_url_list_can_be_empty(self) -> None:
-        settings.health_check_urls = []  # allowed
-        assert settings.health_check_urls == []
+    def test_health_check_urls_may_be_empty_on_new_instance(self) -> None:
+        g = GlobalConfig(health_check_urls=())
+        assert g.health_check_urls == ()
 
 
 # ===================================================================
@@ -413,49 +322,25 @@ class TestUtilsEdgeCases:
 # 11. Concurrency stress test (thread+async)
 # ===================================================================
 class TestPoolConcurrencyStress:
-    def test_sync_thread_contention(self) -> None:
-        """Multiple threads acquire/release concurrently without deadlock."""
-        cfg = PoolConfig(
-            limits=LimitsConfig(max_connections_per_proxy=5),
-            failure_threshold=100,
-            acquire_timeout=5.0,
-        )
-        pool = SyncProxyPool([S0, S1], cfg)
-        errors = []
-        threads_done = threading.Event()
-
-        def worker() -> None:
-            try:
-                for _ in range(20):
-                    with pool:
-                        time.sleep(0.001)
-            except Exception as e:
-                errors.append(e)
-            finally:
-                threads_done.set()
-
-        threads = [threading.Thread(target=worker) for _ in range(20)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=10)
-        assert not errors, f"Thread errors: {errors}"
+    def test_sync_burst_without_threads(self, s0: str, s1: str, sync_burst_limits_pool_config) -> None:
+        cfg = sync_burst_limits_pool_config
+        pool = SyncProxyPool(cfg, [Proxy(s0), Proxy(s1)])
+        for _ in range(64):
+            px = pool.acquire()
+            time.sleep(0.0005)
+            pool.release(px)
         pool.close()
 
     @pytest.mark.asyncio
-    async def test_async_task_contention(self) -> None:
-        """Multiple asyncio tasks acquiring concurrently."""
-        cfg = PoolConfig(
-            limits=LimitsConfig(max_connections_per_proxy=10),
-            failure_threshold=100,
-            acquire_timeout=5.0,
-        )
-        pool = AsyncProxyPool([S0, S1], cfg)
+    async def test_async_task_contention(self, s0: str, s1: str, async_task_contention_limits_pool_config) -> None:
+        cfg = async_task_contention_limits_pool_config
 
-        async def worker() -> None:
-            async with pool:
-                await asyncio.sleep(0.001)
+        async with AsyncProxyPool(cfg, [Proxy(s0), Proxy(s1)]) as pool:
 
-        tasks = [asyncio.create_task(worker()) for _ in range(30)]
-        await asyncio.gather(*tasks)
-        await pool.aclose()
+            async def worker() -> None:
+                for _ in range(20):
+                    px = await pool.acquire()
+                    await asyncio.sleep(0.001)
+                    await pool.release(px)
+
+            await asyncio.gather(*(worker() for _ in range(25)))

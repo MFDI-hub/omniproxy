@@ -44,16 +44,6 @@ class PoolStructure(str, Enum):
     LIST = "list"
     DEQUE = "deque"
 
-
-class HealthStrategy(str, Enum):
-    """Legacy health scheduling keys (kept for backwards compatibility)."""
-
-    ON_FAILURE = "on_failure"
-    ON_FAILURE_RECOVER = "on_failure_recover"
-    TTL = "ttl"
-    TTL_AND_FAILURE = "ttl_and_failure"
-
-
 class FilterMissingMetadata(str, Enum):
     """:attr:`~omniproxy.config.PoolConfig.filter_missing_metadata` behaviour."""
 
@@ -114,13 +104,22 @@ class AnonymityLeakHeader(str, Enum):
     VIA = "via"
     FORWARDED = "forwarded"
 
+class DeadLetterPersistence(str, Enum):
+    """Backing store for dead-letter metadata.
+
+    Members:
+        MEMORY: Keep entries only in process memory.
+        STATE_STORE: Persist via :attr:`PoolConfig.state_store_factory` (requires a factory).
+    """
+
+    MEMORY = "memory"
+    STATE_STORE = "state_store"
 
 __all__ = [
     "AnonymityLeakHeader",
     "AnonymityTier",
     "CircuitBreakerState",
     "FilterMissingMetadata",
-    "HealthStrategy",
     "HttpBackend",
     "HttpVerb",
     "IoInvalidLinePolicy",
@@ -129,4 +128,5 @@ __all__ = [
     "ProxyProtocol",
     "SessionCooldownPolicy",
     "WarmupFailurePolicy",
+    "DeadLetterPersistence",
 ]

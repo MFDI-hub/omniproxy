@@ -52,6 +52,9 @@ tls_client = [
 re2 = [
     "google-re2>=1.0",
 ]
+scrape = [
+    "beautifulsoup4>=4.12",
+]
 all = [
     "httpx>=0.27",
     "httpx-socks>=0.9",
@@ -61,6 +64,7 @@ all = [
     "curl-cffi>=0.6",
     "tls-client>=1.0",
     "google-re2>=1.0",
+    "beautifulsoup4>=4.12",
 ]
 
 [dependency-groups]
@@ -74,6 +78,7 @@ dev = [
     "python-dotenv>=1.0.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "beautifulsoup4>=4.12",
     "ruff>=0.4",
     "mkdocs-material>=9.7.6",
     "mkdocstrings[python]>=1.0.3",
