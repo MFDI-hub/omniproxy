@@ -10,7 +10,7 @@ All types are fully hinted – no ``Any`` in public signatures.
 from __future__ import annotations
 
 import logging
-import threading
+import warnings
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Optional, Protocol
 
@@ -112,6 +112,15 @@ class LimitsConfig(BaseModel):
     token_bucket_capacity: float = 1.0
     token_bucket_factory: Callable[["Proxy"], Any] | None = None
 
+    @model_validator(mode="after")
+    def _validate_limits(self) -> LimitsConfig:
+        if (
+            self.max_connections_per_proxy is not None
+            and self.max_connections_per_proxy < 1
+        ):
+            raise ValueError("limits.max_connections_per_proxy must be >= 1 when set")
+        return self
+
 # ---------- LifecycleHooks (fully typed) ----------
 class LifecycleHooks(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -161,6 +170,7 @@ class RefreshConfig(BaseModel):
     fallback_sync_callbacks: list[Callable[[], list["Proxy"]]] = Field(default_factory=list)
     fallback_async_callbacks: list[Callable[[], Awaitable[list["Proxy"]]]] = Field(default_factory=list)
     timeout: float = 10.0
+    interval_seconds: float = 300.0
 
 class SessionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -243,6 +253,7 @@ class PoolConfig(BaseModel):
     dead_letter: DeadLetterConfig = Field(default_factory=DeadLetterConfig)
 
     # ----- Pool‑wide meta fields -----
+    # acquire_timeout: 0 = no condition wait (still tries on-demand refresh), >0 = timed wait, <0 = wait forever
     acquire_timeout: float = 0.0
     wait_fallback_interval: float = 0.25
     filter_missing_metadata: FilterMissingMetadata = FilterMissingMetadata.SKIP
@@ -285,6 +296,24 @@ class PoolConfig(BaseModel):
         # sizes
         if self.drain_timeout < 0:
             raise ValueError("drain_timeout must be >= 0")
+
+        refresh = self.refresh
+        if refresh.interval_seconds <= 0:
+            raise ValueError("refresh.interval_seconds must be > 0")
+        if refresh.timeout <= 0:
+            raise ValueError("refresh.timeout must be > 0")
+        if refresh.async_callback and refresh.sync_callback:
+            warnings.warn(
+                "Both refresh.async_callback and refresh.sync_callback are set; "
+                "async is tried first, then sync.",
+                stacklevel=2,
+            )
+        if refresh.timeout >= refresh.interval_seconds:
+            warnings.warn(
+                "refresh.timeout >= refresh.interval_seconds; "
+                "background refresh cycles may overlap.",
+                stacklevel=2,
+            )
         if self.min_size is not None and self.min_size < 0:
             raise ValueError("min_size must be >= 0")
         if self.max_size is not None and self.max_size < 0:
@@ -299,7 +328,6 @@ class PoolConfig(BaseModel):
         if dl.retry_interval_seconds is not None and dl.retry_interval_seconds <= 0:
             raise ValueError("dead_letter.retry_interval_seconds must be > 0")
         if dl.persistence == DeadLetterPersistence.STATE_STORE and self.state_store_factory is None:
-            import warnings
             warnings.warn(
                 "dead_letter.persistence='state_store' but state_store_factory is None; "
                 "persisted dead-letter behaviour requires a factory.",
@@ -314,16 +342,20 @@ class PoolConfig(BaseModel):
             if cb.half_open_timeout <= 0:
                 raise ValueError("circuit_breaker.half_open_timeout must be > 0")
 
-        # weighted strategy
+        # weighted / lowest-latency strategies need scoring data
         if self.strategy == PoolStrategy.WEIGHTED and self.scoring is None:
             raise ValueError(
                 "strategy='weighted' requires a ScoringConfig; pass scoring=ScoringConfig() "
                 "or switch to a different strategy."
             )
+        if self.strategy == PoolStrategy.LOWEST_LATENCY and self.scoring is None:
+            raise ValueError(
+                "strategy='lowest_latency' requires a ScoringConfig; pass scoring=ScoringConfig() "
+                "or switch to a different strategy."
+            )
 
         # rotation consistency
         if self.use_rotation_urls and not self.rotate_on_acquire:
-            import warnings
             warnings.warn(
                 "use_rotation_urls=True but rotate_on_acquire=False; rotation URLs will not be called on acquire.",
                 stacklevel=2,

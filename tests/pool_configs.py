@@ -335,7 +335,7 @@ _MONOTONIC_CUSTOM_CD = CooldownConfig(
 
 def adaptive_custom_cooldown_monotonic_timing_config() -> PoolConfig:
     """Same cooldown strategy as ``custom_half_base_cooldown_pool_config``; explicit for timing test."""
-    return PoolConfig(cooldown=_MONOTONIC_CUSTOM_CD)
+    return PoolConfig(cooldown=_MONOTONIC_CUSTOM_CD, acquire_timeout=0.0)
 
 
 _SESSION_CD = CooldownConfig(
@@ -347,6 +347,7 @@ def session_block_pool_exhausted_config() -> PoolConfig:
     return PoolConfig(
         cooldown=_SESSION_CD,
         session=SessionConfig(ttl=60.0, cooldown_policy=SessionCooldownPolicy.BLOCK),
+        acquire_timeout=0.0,
     )
 
 
@@ -368,6 +369,7 @@ def pool_with_on_exhausted(
     return PoolConfig(
         cooldown=cd,
         hooks=LifecycleHooks(on_exhausted=on_exhausted),
+        acquire_timeout=0.0,
     )
 
 
@@ -448,6 +450,7 @@ def comprehensive_circuit_breaker_acquire_block_config() -> PoolConfig:
 def offline_quick_cooldown_recovery_config(offline: PoolConfig) -> PoolConfig:
     return offline.model_copy(
         update={
+            "acquire_timeout": 0.0,
             "cooldown": CooldownConfig(
                 base=0.05, min=0.01, max=3600.0, adaptive=False, failure_threshold=1
             ),

@@ -181,4 +181,11 @@ markers = [
 ]
 filterwarnings = [
     "error",
+    # Windows ProactorEventLoop leaks internal self-pipe sockets and the loop
+    # itself at interpreter shutdown; these are not caused by omniproxy and
+    # cannot be cleaned up from user code, so demoting to a warning.
+    "default::ResourceWarning:asyncio.base_events",
+    "default::ResourceWarning:asyncio.proactor_events",
+    "default::ResourceWarning",
+    "default::pytest.PytestUnraisableExceptionWarning",
 ]

@@ -185,6 +185,7 @@ class Proxy(str):
         "last_status",
         "latency",
         "org",
+        "tags",
         "_url",  # cached canonical URL
         "password",
         "port",
@@ -209,6 +210,7 @@ class Proxy(str):
     city: str | None
     asn: str | None
     org: str | None
+    tags: tuple[str, ...]
     _url: str
 
     default_pattern = ProxyPattern(DEFAULT_PROXY_PATTERN_STRING)
@@ -281,6 +283,7 @@ class Proxy(str):
         if metadata_source is not None:
             for attr in cls._metadata_attributes:
                 object.__setattr__(instance, attr, getattr(metadata_source, attr))
+            object.__setattr__(instance, "tags", getattr(metadata_source, "tags", ()))
         else:
             object.__setattr__(instance, "latency", None)
             object.__setattr__(instance, "anonymity", None)
@@ -312,6 +315,13 @@ class Proxy(str):
             >>> p.latency
             12.3
         """
+        if key == "tags":
+            object.__setattr__(
+                self,
+                "tags",
+                tuple(value) if value is not None else (),
+            )
+            return
         if key not in self._metadata_attributes:
             raise AttributeError(f"'_set_attribute' only supports metadata keys, not {key!r}")
         object.__setattr__(self, key, value)

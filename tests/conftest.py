@@ -78,8 +78,12 @@ def proxy_with_meta(url: str, **meta: Any) -> Proxy:
     """Return a Proxy instance with custom attributes set."""
     p = Proxy(url)
     for k, v in meta.items():
-        if v is not None:
+        if v is None:
+            continue
+        if k in p._metadata_attributes:
             p._set_attribute(k, v)
+        else:
+            object.__setattr__(p, k, v)
     return p
 
 
@@ -135,7 +139,10 @@ def mock_backend() -> Generator[Any, None, None]:
     mock = MagicMock(spec=['get', 'aget', 'request_direct', 'arequest_direct'])
     mock.get = MagicMock()
     mock.aget = AsyncMock()
-    with patch("omniproxy.extended_proxy.get_backend", return_value=mock):
+    mock.arequest_direct = AsyncMock()
+    with patch("omniproxy.extended_proxy.get_backend", return_value=mock), \
+         patch("omniproxy.backends.factory.get_backend", return_value=mock), \
+         patch("omniproxy.proxy.get_backend", return_value=mock, create=True):
         yield mock
 
 

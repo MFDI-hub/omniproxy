@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from omniproxy import Proxy
-from omniproxy.config import DeadLetterConfig, LifecycleHooks, PoolConfig, WarmupConfig
+from omniproxy.config import DeadLetterConfig, LifecycleHooks, PoolConfig, RefreshConfig, WarmupConfig
 from omniproxy.dead_letter import DeadLetterEntry, maybe_add
 from omniproxy.enum import PoolStrategy, SessionCooldownPolicy
 from omniproxy.errors import PoolClosedError, PoolDrainingError, WarmupFailedError
@@ -132,7 +132,9 @@ async def test_on_demand_fetchers_refill_when_empty_and_no_refresh_callbacks(s0:
 
 @pytest.mark.asyncio
 async def test_background_refresh_merges_new_once(monkeypatch: pytest.MonkeyPatch, s0: str, s3: str) -> None:
-    cfg = pool_configs.extended_quick_close_only_config(drain_timeout=0.0)
+    cfg = pool_configs.extended_quick_close_only_config(drain_timeout=0.0).model_copy(
+        update={"refresh": RefreshConfig(sync_callback=lambda: [])}
+    )
     starter = Proxy(s0)
     newcomer = Proxy(s3)
 
@@ -250,7 +252,9 @@ async def test_rotate_on_acquire_triggers_rotation_request(
         "login:pass@203.0.113.56:8899[https://rotate.invalid/flip]",
     )
     assert p.rotation_url is not None
-    mock_backend.arequest_direct = AsyncMock(return_value=True)
+    rotation_response = MagicMock()
+    rotation_response.status_code = 200
+    mock_backend.arequest_direct = AsyncMock(return_value=rotation_response)
 
     async with AsyncProxyPool(extended_rotate_on_acquire_pool_config, [p]) as pool:
         px = await pool.acquire()

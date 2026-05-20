@@ -15,7 +15,7 @@ class OmniproxyError(Exception):
 
 
 class ProxyPoolError(OmniproxyError):
-    """Base class for errors raised by :class:`~omniproxy.pool.ProxyPool` selection or accounting.
+    """Base class for errors raised by :class:`~omniproxy.pool.AsyncProxyPool` selection or accounting.
 
     Concrete subclasses describe **why** acquisition failed (empty pool, no filter match, or
     saturation under limits).
@@ -32,26 +32,26 @@ class PoolExhausted(ProxyPoolError):
 
     .. note::
 
-        :meth:`~omniproxy.pool.ProxyPool.get_next` may invoke :attr:`~omniproxy.config.PoolConfig.refresh_callback`
-        once before surfacing this error when configured.
+        :meth:`~omniproxy.pool.AsyncProxyPool.acquire` may invoke configured refresh callbacks
+        once before surfacing this error when the pool is empty or fully blocked.
 
     Attributes
     ----------
     args: :class:`tuple`
-        Explanation such as ``No proxies available`` or ``Refresh timed out``.
+        Explanation such as ``No proxies available`` or ``All matching proxies are cooling down``.
     """
 
 
 class PoolSaturated(ProxyPoolError):
     """Raised when candidate proxies exist for the given filters but all are blocked by limits.
 
-    Triggers when every matching URL is at :attr:`~omniproxy.config.LimitsConfig.max_connections_per_proxy`
-    **or** fails the per-URL RPS token bucket (:class:`~omniproxy.pool.TokenBucket`).
+    Triggers when every matching URL is at
+    :attr:`~omniproxy.config.LimitsConfig.max_connections_per_proxy`.
 
     Attributes
     ----------
     args: :class:`tuple`
-        Default message explains saturation (connections and/or rate limits).
+        Default message explains saturation (connection limits).
     """
 
 
@@ -75,21 +75,20 @@ class MissingProxyMetadata(ProxyPoolError):
     Attributes
     ----------
     args: :class:`tuple`
-        Message identifies the proxy (often :attr:`~omniproxy.proxy.Proxy.safe_url`) and missing key.
+        Message identifies the missing metadata field and the filter that triggered the check.
     """
 
 
-class PoolClosedError(RuntimeError):
-    """Raised when a closed :class:`~omniproxy.pool.ProxyPool` rejects new work (clean lifecycle).
+class PoolClosedError(OmniproxyError, RuntimeError):
+    """Raised when a closed pool rejects new work (clean lifecycle).
 
-    This is a :class:`RuntimeError` subclass so callers that broadly catch ``Exception`` still see
-    shutdown as distinct from :exc:`PoolExhausted` / :exc:`PoolSaturated`, while ``BaseException``
-    handlers remain unaffected.
+    Inherits from both :class:`OmniproxyError` and :class:`RuntimeError` so callers can catch
+    either the library base or runtime errors.
 
     Attributes
     ----------
     args: :class:`tuple`
-        Human-readable reason (typically ``"proxy pool is closed"``).
+        Human-readable reason (typically ``"Pool is closed"``).
     """
 
 
@@ -102,7 +101,7 @@ class SessionBrokenError(ProxyPoolError):
 
 
 class WarmupFailedError(ProxyPoolError):
-    """Raised when pool warmup cannot satisfy :attr:`~omniproxy.config.PoolConfig.min_ready`."""
+    """Raised when pool warmup cannot satisfy :attr:`~omniproxy.config.WarmupConfig.min_ready`."""
 
 
 class ConfigurationError(OmniproxyError):
