@@ -38,14 +38,14 @@ All line references point at [`omniproxy/pool.py`](../omniproxy/pool.py).
 
 ```mermaid
 flowchart TB
-    subgraph Public API
+    subgraph public_api["Public API"]
         A[acquire]
         R[release]
         MS[mark_success]
         MF[mark_failed]
     end
 
-    subgraph Core state["_state_lock protects"]
+    subgraph core_state["_state_lock protects"]
         Q["_proxies deque"]
         C["_connections"]
         CD["_cooldown_until"]
@@ -53,13 +53,13 @@ flowchart TB
         SR["_session_registry"]
     end
 
-    subgraph Policies
+    subgraph policies["Policies"]
         CB[CircuitBreaker]
         ST[SelectionStrategy]
         FIL[Filters + session]
     end
 
-    subgraph Background
+    subgraph background["Background"]
         HC[_health_check_loop]
         RF[_refresh_loop]
         DL[_dead_letter_retrier]
@@ -93,22 +93,22 @@ sequenceDiagram
     participant Pool as AsyncProxyPool
     participant BG as Background tasks
 
-    App->>Pool: async with pool ( __aenter__ )
+    App->>Pool: async with pool (__aenter__)
     Pool->>Pool: _start()
     Pool->>BG: health / refresh / dead-letter / metrics
     Pool->>Pool: optional warmup
     Pool->>Pool: _ready.set()
 
-    App->>Pool: acquire(**filters)
+    App->>Pool: acquire(filters)
     Pool-->>App: Proxy
 
     alt success
-        App->>Pool: mark_success(proxy, latency) OR release(proxy)
+        App->>Pool: mark_success OR release
     else failure
         App->>Pool: mark_failed(proxy, exc)
     end
 
-    App->>Pool: __aexit__ → _close()
+    App->>Pool: __aexit__ then _close()
     Pool->>Pool: drain leases, cancel BG tasks
 ```
 
@@ -197,8 +197,8 @@ flowchart TD
     MARK --> BREAK[break loop]
     SELECT -->|None| TIMEOUT{timeout budget?}
 
-    TIMEOUT -->|timeout < 0| WAIT_INF[_wait_for_availability None]
-    TIMEOUT -->|remaining > 0| WAIT[_wait_for_availability remaining]
+    TIMEOUT -->|timeout negative| WAIT_INF[_wait_for_availability None]
+    TIMEOUT -->|remaining positive| WAIT[_wait_for_availability remaining]
     WAIT_INF --> LOOP
     WAIT --> LOOP
 
@@ -209,7 +209,7 @@ flowchart TD
     META -->|no| REFRESH{on-demand refresh?}
     REFRESH -->|once| ODR[_attempt_on_demand_refresh]
     ODR -->|added proxies| LOOP
-    REFRESH -->|no| FAIL[_classify_acquire_failure → raise]
+    REFRESH -->|no| FAIL[_classify_acquire_failure then raise]
 
     BREAK --> ROTATE{rotate_on_acquire?}
     ROTATE -->|yes| AROT[proxy.arotate]
@@ -339,7 +339,7 @@ Started in `_start`, cancelled in `_stop_background_tasks`.
 
 ```mermaid
 flowchart TB
-    subgraph Health["_health_check_loop (L1487)"]
+    subgraph health["_health_check_loop L1487"]
         H1[sleep check_interval]
         H2[gather candidates not in cooldown]
         H3[arun_health_check bounded by _health_sem]
@@ -347,18 +347,18 @@ flowchart TB
         H1 --> H2 --> H3 --> H4 --> H1
     end
 
-    subgraph Refresh["_refresh_loop (L1556)"]
+    subgraph refresh["_refresh_loop L1556"]
         R1{urgent _refresh_needed?}
         R1 -->|no| R2[sleep interval_seconds]
         R1 -->|yes| R3[_refresh_and_merge]
         R2 --> R3 --> R1
     end
 
-    subgraph DeadLetter["_dead_letter_retrier (L1536)"]
+    subgraph dead_letter["_dead_letter_retrier L1536"]
         D1[retry_cycle in dead_letter.py]
     end
 
-    subgraph Metrics["_metrics_worker (L1588)"]
+    subgraph metrics["_metrics_worker L1588"]
         M1[drain _metrics_queue]
         M2[metrics_exporter.emit_gauge]
         M1 --> M2 --> M1
