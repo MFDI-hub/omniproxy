@@ -1,0 +1,2441 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Use a proxy as a string, but achieve broad functionality for parsing, checking, pooling, and automation.">
+      
+      
+      
+        <link rel="canonical" href="https://mfdi.github.io/omniproxy/for_mine_and_only_my/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>AsyncProxyPool — step-by-step walkthrough - omniproxy</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#asyncproxypool-step-by-step-walkthrough" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="omniproxy" class="md-header__button md-logo" aria-label="omniproxy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            omniproxy
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              AsyncProxyPool — step-by-step walkthrough
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/MFDI-hub/omniproxy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MFDI-hub/omniproxy
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/overview.md" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../cli.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="omniproxy" class="md-nav__button md-logo" aria-label="omniproxy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    omniproxy
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/MFDI-hub/omniproxy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MFDI-hub/omniproxy
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/overview.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/proxy.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/parser.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/backends.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/checking.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File and network I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/pools.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/exports.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package layout and exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Mental model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-usage-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Usage lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-internal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Internal state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-startup-shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Startup &amp; shutdown
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Startup &amp; shutdown">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#startup-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup chain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shutdown-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shutdown chain
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-acquire-the-main-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Acquire — the main loop
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Acquire — the main loop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-one-iteration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-step (one iteration)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#waiting-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Waiting helpers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-after-acquire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. After acquire
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-selection-filtering-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Selection &amp; filtering pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Selection &amp; filtering pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filter-helpers-all-synchronous-called-under-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filter helpers (all synchronous, called under lock)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-background-workers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Background workers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-refresh-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Refresh &amp; merge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-health-checks-dead-letter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Health checks &amp; dead letter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Health checks &amp; dead letter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#health-check-result-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health check result path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown application
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warmup-startup-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warmup (startup only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-method-index-by-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Method index by role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Method index by role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lifecycle-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle &amp; context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-acquire-release-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public acquire / release API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#availability-waiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Availability &amp; waiting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selection-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selection &amp; filters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-accounting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure accounting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background &amp; metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hooks-circuit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hooks &amp; circuit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supporting-types-same-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supporting types (same file)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-external-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. External modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Exceptions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Exceptions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-acquire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From acquire
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision-tree-for-acquire-failure-after-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision tree for acquire failure (after timeout)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-reading-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested reading order
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="asyncproxypool-step-by-step-walkthrough">AsyncProxyPool — step-by-step walkthrough<a class="headerlink" href="#asyncproxypool-step-by-step-walkthrough" title="Permanent link">&para;</a></h1>
+<p>Follow the proxy pool logic in order, or jump to any section via the table of contents.
+All line references point at <a href="../omniproxy/pool.py"><code>omniproxy/pool.py</code></a>.</p>
+<hr />
+<h2 id="table-of-contents">Table of contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-mental-model">Mental model</a></li>
+<li><a href="#2-usage-lifecycle">Usage lifecycle</a></li>
+<li><a href="#3-internal-state">Internal state (what each field tracks)</a></li>
+<li><a href="#4-startup--shutdown">Startup &amp; shutdown</a></li>
+<li><a href="#5-acquire--the-main-loop">Acquire — the main loop</a></li>
+<li><a href="#6-after-acquire">After acquire — release / success / failure</a></li>
+<li><a href="#7-selection--filtering-pipeline">Selection &amp; filtering pipeline</a></li>
+<li><a href="#8-background-workers">Background workers</a></li>
+<li><a href="#9-refresh--merge">Refresh &amp; merge</a></li>
+<li><a href="#10-health-checks--dead-letter">Health checks &amp; dead letter</a></li>
+<li><a href="#11-method-index-by-role">Method index by role</a></li>
+<li><a href="#12-external-modules">External modules</a></li>
+<li><a href="#13-exceptions">Exceptions you can hit</a></li>
+</ol>
+<hr />
+<h2 id="1-mental-model">1. Mental model<a class="headerlink" href="#1-mental-model" title="Permanent link">&para;</a></h2>
+<p><code>AsyncProxyPool</code> is a <strong>lease manager</strong> over a <code>deque[Proxy]</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Proxy in deque</strong></td>
+<td>Candidate in the pool (may be cooling down or at cap)</td>
+</tr>
+<tr>
+<td><strong>Lease</strong></td>
+<td><code>_connections[url]</code> counter incremented on <code>acquire</code>, decremented on <code>release</code> / <code>mark_*</code></td>
+</tr>
+<tr>
+<td><strong>Eligible</strong></td>
+<td>Passes filters, not in cooldown, under connection cap</td>
+</tr>
+<tr>
+<td><strong>Strategy</strong></td>
+<td>Picks one proxy from eligible list (round-robin, random, weighted, lowest-latency)</td>
+</tr>
+<tr>
+<td><strong>Circuit breaker</strong></td>
+<td>Pool-wide gate; when open, <code>acquire</code> waits or raises</td>
+</tr>
+<tr>
+<td><strong>Sticky session</strong></td>
+<td><code>session_key</code> binds to one proxy URL until TTL or rebind</td>
+</tr>
+</tbody>
+</table>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>flowchart TB
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    subgraph Public API
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        A[acquire]
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        R[release]
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        MS[mark_success]
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        MF[mark_failed]
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    end
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    subgraph Core state[&quot;_state_lock protects&quot;]
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        Q[&quot;_proxies deque&quot;]
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        C[&quot;_connections&quot;]
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        CD[&quot;_cooldown_until&quot;]
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        SC[&quot;_scores&quot;]
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        SR[&quot;_session_registry&quot;]
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    end
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    subgraph Policies
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        CB[CircuitBreaker]
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        ST[SelectionStrategy]
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        FIL[Filters + session]
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    end
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    subgraph Background
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>        HC[_health_check_loop]
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>        RF[_refresh_loop]
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        DL[_dead_letter_retrier]
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        MT[_metrics_worker]
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    end
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    A --&gt; FIL --&gt; ST --&gt; Q
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    A --&gt; CB
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    A --&gt; C
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>    R --&gt; C
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    MS --&gt; C
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    MS --&gt; SC
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    MS --&gt; CB
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>    MF --&gt; C
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>    MF --&gt; SC
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>    MF --&gt; CD
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>    MF --&gt; CB
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>    HC --&gt; Q
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    RF --&gt; Q
+</span></code></pre></div>
+<p><strong>SyncProxyPool</strong> (<code>pool.py</code> L1663+) is a thin wrapper: daemon thread + event loop, delegates every call to <code>AsyncProxyPool</code>.</p>
+<hr />
+<h2 id="2-usage-lifecycle">2. Usage lifecycle<a class="headerlink" href="#2-usage-lifecycle" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sequenceDiagram
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    participant App
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    participant Pool as AsyncProxyPool
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    participant BG as Background tasks
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    App-&gt;&gt;Pool: async with pool ( __aenter__ )
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    Pool-&gt;&gt;Pool: _start()
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    Pool-&gt;&gt;BG: health / refresh / dead-letter / metrics
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    Pool-&gt;&gt;Pool: optional warmup
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    Pool-&gt;&gt;Pool: _ready.set()
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    App-&gt;&gt;Pool: acquire(**filters)
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    Pool--&gt;&gt;App: Proxy
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    alt success
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        App-&gt;&gt;Pool: mark_success(proxy, latency) OR release(proxy)
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    else failure
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        App-&gt;&gt;Pool: mark_failed(proxy, exc)
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    end
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    App-&gt;&gt;Pool: __aexit__ → _close()
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    Pool-&gt;&gt;Pool: drain leases, cancel BG tasks
+</span></code></pre></div>
+<p><strong>Rule:</strong> Call exactly one of <code>release</code>, <code>mark_success</code>, or <code>mark_failed</code> per acquisition — not <code>release</code> + <code>mark_success</code>.</p>
+<hr />
+<h2 id="3-internal-state">3. Internal state<a class="headerlink" href="#3-internal-state" title="Permanent link">&para;</a></h2>
+<p>Built in <code>__init__</code> (L157–221):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_proxies</code></td>
+<td><code>deque[Proxy]</code></td>
+<td>Ordered pool; front evicted when <code>max_size</code> exceeded</td>
+</tr>
+<tr>
+<td><code>_connections</code></td>
+<td><code>dict[str, int]</code></td>
+<td>Active leases per proxy URL</td>
+</tr>
+<tr>
+<td><code>_cooldown_until</code></td>
+<td><code>dict[str, float]</code></td>
+<td>Monotonic timestamp when cooldown ends</td>
+</tr>
+<tr>
+<td><code>_scores</code></td>
+<td><code>dict[str, EMAState]</code></td>
+<td>EMA success/latency for weighted / lowest-latency strategies</td>
+</tr>
+<tr>
+<td><code>_consecutive_failures</code></td>
+<td><code>dict[str, int]</code></td>
+<td>Drives cooldown threshold</td>
+</tr>
+<tr>
+<td><code>_session_registry</code></td>
+<td><code>dict[str, SessionEntry]</code></td>
+<td>Sticky session → proxy URL + expiry</td>
+</tr>
+<tr>
+<td><code>_pending_session_rebind</code></td>
+<td><code>dict[str, Proxy]</code></td>
+<td>Old proxy waiting for <code>on_session_rebind</code> hook</td>
+</tr>
+<tr>
+<td><code>_circuit_breaker</code></td>
+<td><code>CircuitBreaker \| None</code></td>
+<td>Pool-wide failure shedding</td>
+</tr>
+<tr>
+<td><code>_half_open_probe_*</code></td>
+<td>epoch, url, proxy</td>
+<td>Tracks HALF_OPEN probe acquisition</td>
+</tr>
+<tr>
+<td><code>_strategy</code></td>
+<td><code>SelectionStrategy</code></td>
+<td>Built from <code>config.strategy</code></td>
+</tr>
+<tr>
+<td><code>_dead_letter_queue</code></td>
+<td><code>list</code></td>
+<td>Proxies awaiting retry (see <code>dead_letter.py</code>)</td>
+</tr>
+<tr>
+<td><code>_refresh_needed</code></td>
+<td><code>bool</code></td>
+<td>Urgent refresh when below <code>min_size</code></td>
+</tr>
+<tr>
+<td><code>_refresh_generation</code></td>
+<td><code>int</code></td>
+<td>Coalesces concurrent on-demand refreshes</td>
+</tr>
+<tr>
+<td><code>_statistics</code></td>
+<td><code>PoolStatistics</code></td>
+<td>served / failed / released / exhausted_count</td>
+</tr>
+<tr>
+<td><code>_ready</code></td>
+<td><code>Event</code></td>
+<td>Blocks <code>acquire</code> until startup completes</td>
+</tr>
+<tr>
+<td><code>_draining</code></td>
+<td><code>Event</code></td>
+<td>Set during shutdown</td>
+</tr>
+<tr>
+<td><code>_state_lock</code> + <code>_available_cond</code></td>
+<td><code>Lock</code> + <code>Condition</code></td>
+<td>Serialize state; wake waiters</td>
+</tr>
+<tr>
+<td><code>_refresh_lock</code></td>
+<td><code>Lock</code></td>
+<td>One refresh at a time</td>
+</tr>
+<tr>
+<td><code>_close_lock</code></td>
+<td><code>Lock</code></td>
+<td>Idempotent close</td>
+</tr>
+</tbody>
+</table>
+<p>Locks: <strong>always</strong> mutate pool state under <code>_state_lock</code>. Refresh uses <code>_refresh_lock</code> then takes <code>_state_lock</code> inside <code>_merge_new_proxies</code>.</p>
+<hr />
+<h2 id="4-startup-shutdown">4. Startup &amp; shutdown<a class="headerlink" href="#4-startup-shutdown" title="Permanent link">&para;</a></h2>
+<h3 id="startup-chain">Startup chain<a class="headerlink" href="#startup-chain" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>__aenter__  →  _start  →  spawn background tasks  →  optional warmup  →  _ready.set()
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Method</th>
+<th>Lines</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>_start</code></td>
+<td>L256</td>
+<td>Guard closed / already ready</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>_stop_background_tasks</code></td>
+<td>L335</td>
+<td>Cancel any stale tasks</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Create tasks</td>
+<td>L280–301</td>
+<td><code>_health_check_loop</code>, <code>_dead_letter_retrier</code>, <code>_refresh_loop</code>, <code>_metrics_worker</code> — each optional via config</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Warmup</td>
+<td>L303–329</td>
+<td><code>run_warmup</code> + hooks; may <code>raise WarmupFailedError</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Ready</td>
+<td>L330</td>
+<td><code>_ready.set()</code> — unblocks <code>acquire</code></td>
+</tr>
+</tbody>
+</table>
+<p>On any startup exception: <code>_close()</code> then re-raise.</p>
+<h3 id="shutdown-chain">Shutdown chain<a class="headerlink" href="#shutdown-chain" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>__aexit__ / close  →  _close  →  drain  →  _closed=True  →  _stop_background_tasks
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Method</th>
+<th>Lines</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>_draining.set()</code></td>
+<td>L379</td>
+<td>New acquires get <code>PoolDrainingError</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Wait for leases</td>
+<td>L392–402</td>
+<td>Until <code>_connections</code> sum is 0 or <code>drain_timeout</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>_closed = True</code></td>
+<td>L404</td>
+<td>Permanent</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Cancel BG tasks</td>
+<td>L408</td>
+<td>Health, refresh, metrics, dead-letter</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-acquire-the-main-loop">5. Acquire — the main loop<a class="headerlink" href="#5-acquire-the-main-loop" title="Permanent link">&para;</a></h2>
+<p>Entry: <code>acquire</code> (L552). This is the heart of the pool.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>flowchart TD
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    START([acquire called]) --&gt; READY[await _ready]
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    READY --&gt; OPTS[AcquireOptions.from_kwargs]
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    OPTS --&gt; LOOP{while True}
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    LOOP --&gt; LOCK[async with _state_lock]
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    LOCK --&gt; AVAIL[_check_availability]
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    AVAIL --&gt;|PoolCircuitOpenError| WAIT_CB[store exception, skip select]
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    AVAIL --&gt;|ok| SELECT[_select]
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    SELECT --&gt;|proxy found| MARK[_mark_acquired + hooks]
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    MARK --&gt; BREAK[break loop]
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    SELECT --&gt;|None| TIMEOUT{timeout budget?}
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    TIMEOUT --&gt;|timeout &lt; 0| WAIT_INF[_wait_for_availability None]
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    TIMEOUT --&gt;|remaining &gt; 0| WAIT[_wait_for_availability remaining]
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    WAIT_INF --&gt; LOOP
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    WAIT --&gt; LOOP
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    TIMEOUT --&gt;|exhausted| CLASSIFY{circuit open?}
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    CLASSIFY --&gt;|yes| RAISE_CB[raise PoolCircuitOpenError]
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>    CLASSIFY --&gt;|no| META{missing metadata?}
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>    META --&gt;|yes| RAISE_META[raise MissingProxyMetadata]
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>    META --&gt;|no| REFRESH{on-demand refresh?}
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    REFRESH --&gt;|once| ODR[_attempt_on_demand_refresh]
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    ODR --&gt;|added proxies| LOOP
+</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>    REFRESH --&gt;|no| FAIL[_classify_acquire_failure → raise]
+</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>
+</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>    BREAK --&gt; ROTATE{rotate_on_acquire?}
+</span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>    ROTATE --&gt;|yes| AROT[proxy.arotate]
+</span><span id="__span-4-30"><a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>    ROTATE --&gt;|no| HOOKS[run_deferred hooks]
+</span><span id="__span-4-31"><a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>    AROT --&gt; HOOKS
+</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>    HOOKS --&gt; RETURN([return Proxy])
+</span></code></pre></div>
+<h3 id="step-by-step-one-iteration">Step-by-step (one iteration)<a class="headerlink" href="#step-by-step-one-iteration" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>await self._ready.wait()</code></strong> — pool must be started.</li>
+<li><strong><code>AcquireOptions.from_kwargs</code></strong> — merge caller filters with pool defaults (<code>tags</code>, <code>accept_callback</code>, <code>session_id</code> alias).</li>
+<li><strong>Under <code>_state_lock</code>:</strong></li>
+<li><strong><code>_check_availability</code></strong> — closed? draining? circuit open?</li>
+<li><strong><code>_append_circuit_hooks</code></strong> — queue open/close hook callbacks.</li>
+<li><strong><code>_select(options)</code></strong> → if proxy:<ul>
+<li><strong><code>_mark_acquired</code></strong> — bump lease, stats, session bind, HALF_OPEN probe tag.</li>
+<li>Queue <code>on_proxy_acquired</code>; maybe <code>on_session_rebind</code>.</li>
+<li><strong>break</strong> out of loop.</li>
+</ul>
+</li>
+<li><strong>If no proxy:</strong> wait on <code>_available_cond</code> (respects <code>acquire_timeout</code> and next cooldown wakeup via <code>_bounded_wait_timeout</code>).</li>
+<li><strong>When timeout exhausted (still under lock logic, then outside):</strong></li>
+<li>Circuit open → <code>PoolCircuitOpenError</code></li>
+<li>Missing required metadata → <code>MissingProxyMetadata</code></li>
+<li>Else <strong>one</strong> on-demand refresh via <code>_attempt_on_demand_refresh</code></li>
+<li>Else <strong><code>_classify_acquire_failure</code></strong> → <code>PoolExhausted</code> / <code>PoolSaturated</code> / <code>NoMatchingProxy</code></li>
+<li><strong>After loop:</strong> optional <code>proxy.arotate()</code> if <code>rotate_on_acquire</code>; run deferred hooks; return proxy.</li>
+</ol>
+<h3 id="waiting-helpers">Waiting helpers<a class="headerlink" href="#waiting-helpers" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_bounded_wait_timeout</code></td>
+<td>Min of fallback interval, user budget, next cooldown expiry</td>
+</tr>
+<tr>
+<td><code>_wait_for_availability</code></td>
+<td><code>Condition.wait</code> with bounded timeout</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-after-acquire">6. After acquire<a class="headerlink" href="#6-after-acquire" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>flowchart LR
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    ACQ[acquire returns Proxy] --&gt; USE[your HTTP request]
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    USE --&gt;|OK| PATH{how to return?}
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    PATH --&gt;|latency known| MS[mark_success]
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    PATH --&gt;|simple return| REL[release]
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    USE --&gt;|error| MF[mark_failed]
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    MS --&gt; DEC1[_return_lease count_release_stat=False]
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    REL --&gt; DEC2[_return_lease count_release_stat=True]
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    MF --&gt; DEC3[_return_lease count_release_stat=False]
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    MS --&gt; SC[update EMA, clear cooldown]
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    MS --&gt; CB1[circuit.record_success]
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    MF --&gt; FAIL[consecutive_failures++, EMA fail]
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    MF --&gt; CD[_apply_cooldown]
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    MF --&gt; CB2[circuit.record_failure]
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    MF --&gt; ROT[optional arotate]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+<th>Lease</th>
+<th>Stats</th>
+<th>Scoring</th>
+<th>Cooldown</th>
+<th>Circuit</th>
+<th>Hooks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>release</code></td>
+<td>L673</td>
+<td>✓ released++</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>clears HALF_OPEN probe</td>
+<td><code>on_proxy_released</code></td>
+</tr>
+<tr>
+<td><code>mark_success</code></td>
+<td>L750</td>
+<td>✓</td>
+<td>—</td>
+<td>EMA +</td>
+<td>clears</td>
+<td><code>record_success</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>mark_failed</code></td>
+<td>L698</td>
+<td>✓</td>
+<td>failed++</td>
+<td>EMA −</td>
+<td><code>_apply_cooldown</code></td>
+<td><code>record_failure</code></td>
+<td><code>on_proxy_failed</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Important:</strong> Health-check results (<code>_apply_check_result</code>) update scoring/cooldown but <strong>do not</strong> feed the circuit breaker — only client-reported <code>mark_success</code> / <code>mark_failed</code> do.</p>
+<hr />
+<h2 id="7-selection-filtering-pipeline">7. Selection &amp; filtering pipeline<a class="headerlink" href="#7-selection-filtering-pipeline" title="Permanent link">&para;</a></h2>
+<p>Called from <code>_select</code> → <code>_get_eligible</code> → strategy.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>flowchart TD
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    SEL[_select] --&gt; ELIG[_get_eligible]
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    ELIG --&gt; SK{session_key?}
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    SK --&gt;|yes| RES[resolve_session in session.py]
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    RES --&gt;|bound + ok| ONE[return single proxy]
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    RES --&gt;|bound + cooldown| POL{session cooldown_policy}
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    POL --&gt;|BLOCK| EMPTY[return empty]
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    POL --&gt;|RAISE| ERR[SessionBrokenError]
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    POL --&gt;|REBIND| PEND[stash pending_rebind, clear registry]
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    SK --&gt;|no / rebind path| SCAN[for each proxy in deque]
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    SCAN --&gt; CD{in cooldown?}
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    CD --&gt;|yes| SKIP[skip]
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    CD --&gt;|no| CAP{at connection cap?}
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    CAP --&gt;|yes| SKIP
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    CAP --&gt;|no| FIL[_sticky_filters_ok]
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    FIL --&gt;|pass| ADD[add to result]
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    ELIG --&gt; STRAT[_strategy.select eligible, scores, deque]
+</span></code></pre></div>
+<h3 id="filter-helpers-all-synchronous-called-under-lock">Filter helpers (all synchronous, called under lock)<a class="headerlink" href="#filter-helpers-all-synchronous-called-under-lock" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_active_metadata_filters</code></td>
+<td>L906</td>
+<td>country, min_anonymity, tags</td>
+</tr>
+<tr>
+<td><code>_proxy_matches_metadata_filter</code></td>
+<td>L928</td>
+<td>Per-attribute match logic</td>
+</tr>
+<tr>
+<td><code>_metadata_value_missing</code></td>
+<td>L887</td>
+<td>None / empty detection</td>
+</tr>
+<tr>
+<td><code>_anonymity_rank</code></td>
+<td>L870</td>
+<td>transparent &lt; anonymous &lt; elite</td>
+</tr>
+<tr>
+<td><code>_sticky_filters_ok</code></td>
+<td>L1054</td>
+<td>All metadata + <code>accept_callback</code></td>
+</tr>
+<tr>
+<td><code>_at_connection_cap</code></td>
+<td>L1038</td>
+<td>vs <code>limits.max_connections_per_proxy</code></td>
+</tr>
+<tr>
+<td><code>_any_filter_match</code></td>
+<td>L1024</td>
+<td>Any proxy passes filters (for error typing)</td>
+</tr>
+<tr>
+<td><code>_missing_metadata_message</code></td>
+<td>L960</td>
+<td>For <code>FilterMissingMetadata.RAISE</code></td>
+</tr>
+<tr>
+<td><code>_classify_acquire_failure</code></td>
+<td>L990</td>
+<td>Pick Exhausted / Saturated / NoMatchingProxy</td>
+</tr>
+</tbody>
+</table>
+<h3 id="strategy-selection">Strategy selection<a class="headerlink" href="#strategy-selection" title="Permanent link">&para;</a></h3>
+<p><code>_build_strategy</code> (L425) maps <code>PoolStrategy</code> enum → class in <code>strategies.py</code>:</p>
+<ul>
+<li><code>ROUND_ROBIN</code> → <code>RoundRobinStrategy</code> (uses full deque for fair rotation)</li>
+<li><code>RANDOM</code> → <code>RandomStrategy</code></li>
+<li><code>WEIGHTED</code> → <code>WeightedStrategy</code> (uses <code>_scores</code>)</li>
+<li><code>LOWEST_LATENCY</code> → <code>LowestLatencyStrategy</code> (uses <code>_scores</code>)</li>
+</ul>
+<hr />
+<h2 id="8-background-workers">8. Background workers<a class="headerlink" href="#8-background-workers" title="Permanent link">&para;</a></h2>
+<p>Started in <code>_start</code>, cancelled in <code>_stop_background_tasks</code>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>flowchart TB
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    subgraph Health[&quot;_health_check_loop (L1487)&quot;]
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>        H1[sleep check_interval]
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        H2[gather candidates not in cooldown]
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>        H3[arun_health_check bounded by _health_sem]
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        H4[_apply_check_result under lock]
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        H1 --&gt; H2 --&gt; H3 --&gt; H4 --&gt; H1
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    end
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    subgraph Refresh[&quot;_refresh_loop (L1556)&quot;]
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>        R1{urgent _refresh_needed?}
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>        R1 --&gt;|no| R2[sleep interval_seconds]
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>        R1 --&gt;|yes| R3[_refresh_and_merge]
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>        R2 --&gt; R3 --&gt; R1
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    end
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>    subgraph DeadLetter[&quot;_dead_letter_retrier (L1536)&quot;]
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>        D1[retry_cycle in dead_letter.py]
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    end
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
+</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>    subgraph Metrics[&quot;_metrics_worker (L1588)&quot;]
+</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>        M1[drain _metrics_queue]
+</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>        M2[metrics_exporter.emit_gauge]
+</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>        M1 --&gt; M2 --&gt; M1
+</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>    end
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Worker</th>
+<th>Config gate</th>
+<th>Locking</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Health</td>
+<td><code>config.health_check</code></td>
+<td>Snapshot candidates outside lock; apply inside</td>
+</tr>
+<tr>
+<td>Refresh</td>
+<td>fetchers or refresh callbacks</td>
+<td><code>_refresh_lock</code> → <code>_state_lock</code> on merge</td>
+</tr>
+<tr>
+<td>Dead letter</td>
+<td><code>dead_letter.enabled</code></td>
+<td><code>retry_cycle</code> uses <code>_state_lock</code></td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td><code>metrics_exporter</code></td>
+<td>Queue only; worker isolated</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-refresh-merge">9. Refresh &amp; merge<a class="headerlink" href="#9-refresh-merge" title="Permanent link">&para;</a></h2>
+<p>On-demand (from <code>acquire</code>) and periodic (background) share the same merge path.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>_attempt_on_demand_refresh
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  → _refresh_lock (coalesce via _refresh_generation)
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  → _refresh_and_merge
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>       → _fetch_new_proxies (refresh.py)
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>       → _merge_new_proxies
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>       → _check_min_size (may set _refresh_needed)
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_fetch_new_proxies</code></td>
+<td>L1348</td>
+<td>Callbacks beat fetchers</td>
+</tr>
+<tr>
+<td><code>_refresh_and_merge</code></td>
+<td>L1374</td>
+<td>Hooks, fetch, merge, bump generation</td>
+</tr>
+<tr>
+<td><code>_merge_new_proxies</code></td>
+<td>L1416</td>
+<td>Dedupe by URL; evict front if <code>max_size</code></td>
+</tr>
+<tr>
+<td><code>_evict_proxy</code></td>
+<td>L1292</td>
+<td>Clean all bookkeeping for one URL</td>
+</tr>
+<tr>
+<td><code>_has_refresh_source</code></td>
+<td>L1446</td>
+<td>Fetchers or callbacks configured?</td>
+</tr>
+<tr>
+<td><code>_check_min_size</code></td>
+<td>L1465</td>
+<td>Warn + flag urgent refresh</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-health-checks-dead-letter">10. Health checks &amp; dead letter<a class="headerlink" href="#10-health-checks-dead-letter" title="Permanent link">&para;</a></h2>
+<h3 id="health-check-result-path">Health check result path<a class="headerlink" href="#health-check-result-path" title="Permanent link">&para;</a></h3>
+<p><code>_record_health_check_result</code> (async wrapper) → <code>_apply_check_result</code> (L1220):</p>
+<ul>
+<li>Proxy still in pool? (URL set membership)</li>
+<li><strong>Success:</strong> clear failures, update EMA, clear cooldown, hooks <code>on_check_complete</code> + <code>on_proxy_recovered</code></li>
+<li><strong>Failure:</strong> failed stat, failures++, EMA, <code>_apply_cooldown</code>, hooks <code>on_check_complete</code> + <code>on_proxy_failed</code></li>
+</ul>
+<h3 id="cooldown-application">Cooldown application<a class="headerlink" href="#cooldown-application" title="Permanent link">&para;</a></h3>
+<p><code>_apply_cooldown</code> (L1171):</p>
+<ol>
+<li>Skip if <code>consecutive_failures &lt; failure_threshold</code></li>
+<li>Duration from custom <code>cooldown.strategy</code> or <code>compute_cooldown</code> (<code>cooldown.py</code>)</li>
+<li>Store <code>monotonic() + duration</code> in <code>_cooldown_until</code></li>
+</ol>
+<h3 id="warmup-startup-only">Warmup (startup only)<a class="headerlink" href="#warmup-startup-only" title="Permanent link">&para;</a></h3>
+<p>Uses <code>_unchecked_proxies</code> + <code>run_warmup</code> (<code>warmup.py</code>) — not repeated here; runs before <code>_ready</code>.</p>
+<hr />
+<h2 id="11-method-index-by-role">11. Method index by role<a class="headerlink" href="#11-method-index-by-role" title="Permanent link">&para;</a></h2>
+<p>Quick lookup — every method on <code>AsyncProxyPool</code>.</p>
+<h3 id="lifecycle-context">Lifecycle &amp; context<a class="headerlink" href="#lifecycle-context" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__</code></td>
+<td>157</td>
+</tr>
+<tr>
+<td><code>__aenter__</code></td>
+<td>223</td>
+</tr>
+<tr>
+<td><code>__aexit__</code></td>
+<td>240</td>
+</tr>
+<tr>
+<td><code>_start</code></td>
+<td>256</td>
+</tr>
+<tr>
+<td><code>_close</code></td>
+<td>361</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td>410</td>
+</tr>
+<tr>
+<td><code>_stop_background_tasks</code></td>
+<td>335</td>
+</tr>
+</tbody>
+</table>
+<h3 id="public-acquire-release-api">Public acquire / release API<a class="headerlink" href="#public-acquire-release-api" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acquire</code></td>
+<td>552</td>
+</tr>
+<tr>
+<td><code>release</code></td>
+<td>673</td>
+</tr>
+<tr>
+<td><code>mark_failed</code></td>
+<td>698</td>
+</tr>
+<tr>
+<td><code>mark_success</code></td>
+<td>750</td>
+</tr>
+<tr>
+<td><code>statistics</code> (property)</td>
+<td>1650</td>
+</tr>
+</tbody>
+</table>
+<h3 id="availability-waiting">Availability &amp; waiting<a class="headerlink" href="#availability-waiting" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_check_availability</code></td>
+<td>824</td>
+</tr>
+<tr>
+<td><code>_bounded_wait_timeout</code></td>
+<td>476</td>
+</tr>
+<tr>
+<td><code>_wait_for_availability</code></td>
+<td>507</td>
+</tr>
+<tr>
+<td><code>_return_lease</code></td>
+<td>526</td>
+</tr>
+</tbody>
+</table>
+<h3 id="selection-filters">Selection &amp; filters<a class="headerlink" href="#selection-filters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_select</code></td>
+<td>851</td>
+</tr>
+<tr>
+<td><code>_get_eligible</code></td>
+<td>1079</td>
+</tr>
+<tr>
+<td><code>_mark_acquired</code></td>
+<td>1138</td>
+</tr>
+<tr>
+<td><code>_build_strategy</code></td>
+<td>425</td>
+</tr>
+<tr>
+<td><code>_sticky_filters_ok</code></td>
+<td>1054</td>
+</tr>
+<tr>
+<td><code>_active_metadata_filters</code></td>
+<td>906</td>
+</tr>
+<tr>
+<td><code>_proxy_matches_metadata_filter</code></td>
+<td>928</td>
+</tr>
+<tr>
+<td><code>_metadata_value_missing</code></td>
+<td>887</td>
+</tr>
+<tr>
+<td><code>_anonymity_rank</code></td>
+<td>870</td>
+</tr>
+<tr>
+<td><code>_at_connection_cap</code></td>
+<td>1038</td>
+</tr>
+<tr>
+<td><code>_any_filter_match</code></td>
+<td>1024</td>
+</tr>
+<tr>
+<td><code>_missing_metadata_message</code></td>
+<td>960</td>
+</tr>
+<tr>
+<td><code>_classify_acquire_failure</code></td>
+<td>990</td>
+</tr>
+</tbody>
+</table>
+<h3 id="failure-accounting">Failure accounting<a class="headerlink" href="#failure-accounting" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_apply_cooldown</code></td>
+<td>1171</td>
+</tr>
+<tr>
+<td><code>_apply_check_result</code></td>
+<td>1220</td>
+</tr>
+<tr>
+<td><code>_record_health_check_result</code></td>
+<td>808</td>
+</tr>
+<tr>
+<td><code>_count_consecutive_failures</code></td>
+<td>1278</td>
+</tr>
+<tr>
+<td><code>_evict_proxy</code></td>
+<td>1292</td>
+</tr>
+<tr>
+<td><code>_unchecked_proxies</code></td>
+<td>794</td>
+</tr>
+</tbody>
+</table>
+<h3 id="refresh">Refresh<a class="headerlink" href="#refresh" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_attempt_on_demand_refresh</code></td>
+<td>1328</td>
+</tr>
+<tr>
+<td><code>_fetch_new_proxies</code></td>
+<td>1348</td>
+</tr>
+<tr>
+<td><code>_refresh_and_merge</code></td>
+<td>1374</td>
+</tr>
+<tr>
+<td><code>_merge_new_proxies</code></td>
+<td>1416</td>
+</tr>
+<tr>
+<td><code>_has_refresh_source</code></td>
+<td>1446</td>
+</tr>
+<tr>
+<td><code>_check_min_size</code></td>
+<td>1465</td>
+</tr>
+<tr>
+<td><code>_refresh_loop</code></td>
+<td>1556</td>
+</tr>
+</tbody>
+</table>
+<h3 id="background-metrics">Background &amp; metrics<a class="headerlink" href="#background-metrics" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_health_check_loop</code></td>
+<td>1487</td>
+</tr>
+<tr>
+<td><code>_dead_letter_retrier</code></td>
+<td>1536</td>
+</tr>
+<tr>
+<td><code>_metrics_worker</code></td>
+<td>1588</td>
+</tr>
+<tr>
+<td><code>_emit_stat_metric</code></td>
+<td>1607</td>
+</tr>
+<tr>
+<td><code>_enqueue_metric</code></td>
+<td>1629</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hooks-circuit">Hooks &amp; circuit<a class="headerlink" href="#hooks-circuit" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_append_circuit_hooks</code></td>
+<td>451</td>
+</tr>
+</tbody>
+</table>
+<h3 id="supporting-types-same-file">Supporting types (same file)<a class="headerlink" href="#supporting-types-same-file" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AcquireOptions</code></td>
+<td>42</td>
+</tr>
+<tr>
+<td><code>AcquireOptions.from_kwargs</code></td>
+<td>72</td>
+</tr>
+<tr>
+<td><code>PoolStatistics</code></td>
+<td>110</td>
+</tr>
+<tr>
+<td><code>SyncProxyPool</code></td>
+<td>1663</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-external-modules">12. External modules<a class="headerlink" href="#12-external-modules" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../omniproxy/config.py"><code>config.py</code></a></td>
+<td><code>PoolConfig</code> and all sub-configs</td>
+</tr>
+<tr>
+<td><a href="../omniproxy/strategies.py"><code>strategies.py</code></a></td>
+<td><code>SelectionStrategy</code> implementations</td>
+</tr>
+<tr>
+<td><a href="../omniproxy/scoring.py"><code>scoring.py</code></a></td>
+<td><code>EMAState</code>, <code>update_ema</code></td>
+</tr>
+<tr>
+<td><a href="../omniproxy/cooldown.py"><code>cooldown.py</code></a></td>
+<td><code>compute_cooldown</code>, <code>is_in_cooldown</code></td>
+</tr>
+<tr>
+<td><a href="../omniproxy/circuit_breaker.py"><code>circuit_breaker.py</code></a></td>
+<td><code>CircuitBreaker</code>, <code>allow_request</code>, HALF_OPEN</td>
+</tr>
+<tr>
+<td><a href="../omniproxy/session.py"><code>session.py</code></a></td>
+<td><code>resolve_session</code>, <code>SessionEntry</code></td>
+</tr>
+<tr>
+<td><a href="../omniproxy/hooks.py"><code>hooks.py</code></a></td>
+<td><code>run_deferred</code> for lifecycle callbacks</td>
+</tr>
+<tr>
+<td><a href="../omniproxy/refresh.py"><code>refresh.py</code></a></td>
+<td><code>fetch_from_fetchers</code>, <code>fetch_from_refresh_config</code></td>
+</tr>
+<tr>
+<td><a href="../omniproxy/warmup.py"><code>warmup.py</code></a></td>
+<td>Startup warmup</td>
+</tr>
+<tr>
+<td><a href="../omniproxy/dead_letter.py"><code>dead_letter.py</code></a></td>
+<td><code>retry_cycle</code></td>
+</tr>
+<tr>
+<td><a href="../omniproxy/extended_proxy.py"><code>extended_proxy.py</code></a></td>
+<td><code>Proxy</code>, <code>arun_health_check</code></td>
+</tr>
+<tr>
+<td><a href="../omniproxy/errors.py"><code>errors.py</code></a></td>
+<td>Pool exception types</td>
+</tr>
+</tbody>
+</table>
+<p><strong>PlantUML diagrams</strong> (render with any PlantUML viewer): <a href="../diagrams/omniproxy.puml"><code>docs/diagrams/omniproxy.puml</code></a> — see <code>omniproxy-acquire-sequence</code> and <code>omniproxy-classes</code> diagrams.</p>
+<hr />
+<h2 id="13-exceptions">13. Exceptions<a class="headerlink" href="#13-exceptions" title="Permanent link">&para;</a></h2>
+<h3 id="from-acquire">From <code>acquire</code><a class="headerlink" href="#from-acquire" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Exception</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PoolClosedError</code></td>
+<td>After <code>_closed</code></td>
+</tr>
+<tr>
+<td><code>PoolDrainingError</code></td>
+<td>During shutdown drain</td>
+</tr>
+<tr>
+<td><code>PoolCircuitOpenError</code></td>
+<td>Breaker open; timeout exhausted while still open</td>
+</tr>
+<tr>
+<td><code>PoolExhausted</code></td>
+<td>No usable proxies (empty pool, all cooling down, etc.)</td>
+</tr>
+<tr>
+<td><code>PoolSaturated</code></td>
+<td>Matches exist but all at connection cap or cooling down</td>
+</tr>
+<tr>
+<td><code>NoMatchingProxy</code></td>
+<td>Filters exclude every proxy</td>
+</tr>
+<tr>
+<td><code>MissingProxyMetadata</code></td>
+<td><code>filter_missing_metadata=RAISE</code> and required field missing on all</td>
+</tr>
+<tr>
+<td><code>SessionBrokenError</code></td>
+<td>Sticky session proxy in cooldown with <code>RAISE</code> policy</td>
+</tr>
+<tr>
+<td><code>WarmupFailedError</code></td>
+<td>Startup only, if warmup policy is <code>RAISE</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="decision-tree-for-acquire-failure-after-timeout">Decision tree for acquire failure (after timeout)<a class="headerlink" href="#decision-tree-for-acquire-failure-after-timeout" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>_proxies empty?           → PoolExhausted
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>filters active &amp; no match → NoMatchingProxy
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>all matching capped/CD?   → PoolSaturated or PoolExhausted
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>else                      → PoolExhausted
+</span></code></pre></div>
+<hr />
+<h2 id="suggested-reading-order">Suggested reading order<a class="headerlink" href="#suggested-reading-order" title="Permanent link">&para;</a></h2>
+<p>If you are tracing code for the first time:</p>
+<ol>
+<li><code>__init__</code> — know the fields</li>
+<li><code>_start</code> / <code>_close</code> — lifecycle</li>
+<li><code>acquire</code> — main loop (use §5 flowchart)</li>
+<li><code>_get_eligible</code> + <code>_select</code> — who gets picked</li>
+<li><code>mark_success</code> / <code>mark_failed</code> / <code>release</code> — how state moves back</li>
+<li><code>_health_check_loop</code> + <code>_refresh_loop</code> — background maintenance</li>
+<li>Jump to <code>circuit_breaker.py</code>, <code>session.py</code>, <code>strategies.py</code> as needed</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/MFDI-hub/omniproxy" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
