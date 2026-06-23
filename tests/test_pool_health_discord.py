@@ -203,7 +203,9 @@ class TestPoolStateOperations:
     def test_circuit_breaker_opens_and_half_open_recover(
         self, offline_circuit_half_open_recover_pool_config: PoolConfig
     ) -> None:
-        cfg = offline_circuit_half_open_recover_pool_config
+        cfg = offline_circuit_half_open_recover_pool_config.model_copy(
+            update={"acquire_timeout": 0.0}
+        )
         p1 = Proxy("10.10.10.1:80")
         p2 = Proxy("10.10.10.2:80")
         pool = SyncProxyPool(cfg, [p1, p2])

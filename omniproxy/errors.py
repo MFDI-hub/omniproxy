@@ -93,20 +93,69 @@ class PoolClosedError(OmniproxyError, RuntimeError):
 
 
 class PoolDrainingError(ProxyPoolError):
-    """Raised when a pool is draining and rejects new acquisitions."""
+    """Raised when a draining pool rejects a new acquisition.
+
+    Returned during the shutdown window between
+    :meth:`~omniproxy.pool.AsyncProxyPool.aclose` being called and the pool
+    fully releasing in-flight handles.
+
+    Attributes:
+        args (tuple): Default human-readable reason.
+
+    Version:
+        Added in 4.0.0.
+    """
 
 
 class SessionBrokenError(ProxyPoolError):
-    """Raised when a sticky session binding is invalid or the bound proxy is unusable."""
+    """Raised when a sticky session binding is invalid or unusable.
+
+    Typical causes include the bound proxy being marked failed, evicted, or
+    crossing the configured TTL while the session still expects it.
+
+    Attributes:
+        args (tuple): Message describing the session and reason.
+
+    Version:
+        Added in 4.0.0.
+    """
 
 
 class WarmupFailedError(ProxyPoolError):
-    """Raised when pool warmup cannot satisfy :attr:`~omniproxy.config.WarmupConfig.min_ready`."""
+    """Warmup did not satisfy :attr:`~omniproxy.config.WarmupConfig.min_ready`.
+
+    Attributes:
+        args (tuple): Message detailing how many proxies passed warmup and
+            how many were required.
+
+    Version:
+        Added in 4.0.0.
+    """
 
 
 class ConfigurationError(OmniproxyError):
-    """Invalid pool or package configuration."""
+    """Invalid pool or package configuration detected after construction.
+
+    Used for run-time configuration mistakes that cannot be expressed as
+    pydantic validation errors (e.g. conflicting hot-reload settings).
+
+    Attributes:
+        args (tuple): Detail message describing the configuration issue.
+
+    Version:
+        Added in 4.0.0.
+    """
 
 
 class PoolCircuitOpenError(ProxyPoolError):
-    """Raised when the pool-level circuit breaker is open and probes are disallowed."""
+    """Raised when the pool-level circuit breaker is open.
+
+    Acquisitions are short-circuited while the breaker is OPEN and during
+    HALF_OPEN when no probe slot is available.
+
+    Attributes:
+        args (tuple): Default human-readable reason.
+
+    Version:
+        Added in 4.0.0.
+    """

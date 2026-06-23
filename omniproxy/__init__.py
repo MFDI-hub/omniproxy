@@ -1,3 +1,15 @@
+"""omniproxy public API.
+
+This package exposes proxy management primitives for both synchronous and
+asynchronous workloads: configurable proxy pools, health checkers, fetchers
+that pull proxies from disk or remote sources, scoring utilities, and a small
+set of error types. Most users only need to import the symbols re-exported
+here.
+
+Version:
+    4.0.0
+"""
+
 from __future__ import annotations
 
 from .config import settings

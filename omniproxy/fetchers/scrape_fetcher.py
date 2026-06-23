@@ -15,6 +15,21 @@ from ..proxy import Proxy
 
 
 def _sync_download(url: str, headers: dict[str, str], timeout: float | None) -> bytes:
+    """Synchronously download ``url`` over HTTPS for the scraper.
+
+    Args:
+        url (str): Target URL.
+        headers (dict[str, str]): Extra request headers; injects a default
+            ``User-Agent`` when missing.
+        timeout (float | None): Socket timeout; defaults to
+            ``settings.default_timeout``.
+
+    Returns:
+        bytes: Raw response body.
+
+    Version:
+        Added in 4.0.0.
+    """
     to = timeout if timeout is not None else settings.default_timeout
     ctx = ssl.create_default_context()
     hdrs = dict(headers)
@@ -26,11 +41,28 @@ def _sync_download(url: str, headers: dict[str, str], timeout: float | None) -> 
 
 
 class ScrapeFetcher:
-    """Download HTML and extract proxy-shaped strings.
+    """Download an HTML page and extract proxy-shaped strings from it.
 
-    When *css_selectors* is omitted, the entire body is scanned with ``PROXY_LINE_PATTERN``.
-    When *css_selectors* is set, optional dependency ``beautifulsoup4`` is required to run CSS
-    selection (``BeautifulSoup`` + ``.select``).
+    Three extraction strategies are available, in order of priority:
+
+    1. ``custom_extractor`` - user-supplied callable receiving the raw bytes.
+    2. ``css_selectors`` - parse HTML with ``beautifulsoup4`` and collect
+       text or an attribute from matched elements.
+    3. Regex scan (default) - search the body with ``PROXY_LINE_PATTERN`` or
+       a user-supplied regex.
+
+    Attributes:
+        _url (str): Page URL to fetch.
+        _css_selectors (list[str] | None): CSS selectors when scraping HTML.
+        _pattern (re.Pattern[str]): Regex used to find proxy strings.
+        _headers (dict[str, str]): Extra request headers.
+        _timeout (float | None): Socket timeout in seconds.
+        _attribute (str | None): Element attribute to prefer over text.
+        _custom_extractor (Callable[[bytes], list[str]] | None): Optional
+            override extractor.
+
+    Version:
+        Added in 4.0.0.
     """
 
     __slots__ = (
@@ -54,13 +86,24 @@ class ScrapeFetcher:
         attribute: str | None = None,
         custom_extractor: Callable[[bytes], list[str]] | None = None,
     ) -> None:
-        """
+        """Construct a scraping fetcher.
+
         Args:
-            url: Page to retrieve.
-            css_selectors: If provided, each selector's matching elements contribute text or *attribute*.
-            regex: Overrides the default proxy line regex when scanning raw HTML/text.
-            attribute: Element attribute to prefer (e.g. ``\"href\"``); otherwise text content is used.
-            custom_extractor: If set, called with raw response bytes instead of builtin extraction.
+            url (str): Page to retrieve.
+            css_selectors (list[str] | None): When set, each selector's
+                matched elements contribute ``attribute`` or text content.
+            regex (re.Pattern[str] | None): Overrides
+                :data:`PROXY_LINE_PATTERN` when scanning the body.
+            headers (Mapping[str, str] | None): Extra request headers.
+            timeout (float | None): Socket timeout in seconds.
+            attribute (str | None): Element attribute to read in preference
+                to text (typical ``"href"``).
+            custom_extractor (Callable[[bytes], list[str]] | None): If
+                provided, called with the raw response bytes instead of the
+                built-in extractors.
+
+        Version:
+            Added in 4.0.0.
         """
         self._url = url
         self._css_selectors = css_selectors
@@ -71,6 +114,20 @@ class ScrapeFetcher:
         self._custom_extractor = custom_extractor
 
     def _extract_via_bs4(self, html: bytes) -> list[str]:
+        """Extract proxy-shaped strings from HTML using BeautifulSoup.
+
+        Args:
+            html (bytes): Raw response body.
+
+        Returns:
+            list[str]: Deduplicated raw strings collected from selector matches.
+
+        Raises:
+            ImportError: If ``beautifulsoup4`` is not installed.
+
+        Version:
+            Added in 4.0.0.
+        """
         try:
             from bs4 import BeautifulSoup  # type: ignore[import-untyped]
         except ImportError as e:
@@ -103,6 +160,17 @@ class ScrapeFetcher:
         return out
 
     def _extract_via_regex(self, body: bytes) -> list[str]:
+        """Extract proxy-shaped strings by scanning ``body`` with the regex.
+
+        Args:
+            body (bytes): Raw response body.
+
+        Returns:
+            list[str]: Deduplicated proxy strings in first-seen order.
+
+        Version:
+            Added in 4.0.0.
+        """
         text = body.decode("utf-8", errors="replace")
         seen: set[str] = set()
         items: list[str] = []
@@ -118,6 +186,25 @@ class ScrapeFetcher:
         return items
 
     async def fetch(self) -> list[Proxy | str]:
+        """Download the page and extract proxy strings.
+
+        Network errors yield an empty list so a single bad page cannot
+        derail the refresh cycle. When CSS selectors are configured, the
+        method parses HTML on a worker thread and validates each candidate;
+        unparseable lines fall back to a regex sweep.
+
+        Returns:
+            list[Proxy | str]: Validated :class:`Proxy` objects when using
+            CSS selectors, otherwise raw strings ready for downstream
+            validation.
+
+        Raises:
+            ImportError: When CSS selectors are configured but
+                ``beautifulsoup4`` is not installed.
+
+        Version:
+            Added in 4.0.0.
+        """
         try:
             body = await asyncio.to_thread(_sync_download, self._url, self._headers, self._timeout)
         except URLError:

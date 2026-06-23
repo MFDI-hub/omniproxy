@@ -11,6 +11,17 @@ from .base import BackendResponse, BaseBackend
 
 
 def _import_curl_cffi() -> Any:
+    """Import ``curl_cffi`` lazily with a friendly error.
+
+    Returns:
+        Any: The ``curl_cffi`` module object.
+
+    Raises:
+        ImportError: When ``curl_cffi`` is not installed.
+
+    Version:
+        Added in 4.0.0.
+    """
     try:
         import curl_cffi
     except ImportError as e:
@@ -19,13 +30,38 @@ def _import_curl_cffi() -> Any:
 
 
 def _timeout_arg(timeout: float) -> float | None:
-    """Map a backend timeout to curl_cffi; ``0`` or negative means no limit (``None``)."""
+    """Map a backend timeout to a curl_cffi-compatible value.
+
+    Args:
+        timeout (float): Seconds. ``0`` or negative means "no limit".
+
+    Returns:
+        float | None: Float seconds, or ``None`` when the caller asked for
+        no limit.
+
+    Version:
+        Added in 4.0.0.
+    """
     if timeout is None or timeout <= 0:
         return None
     return float(timeout)
 
 
 def _response_from_curl(r: Any) -> BackendResponse:
+    """Convert a curl_cffi response object into a :class:`BackendResponse`.
+
+    JSON parsing is best-effort and never raises; failures leave
+    ``json_data`` as ``None``.
+
+    Args:
+        r (Any): A curl_cffi response.
+
+    Returns:
+        BackendResponse: Normalised representation.
+
+    Version:
+        Added in 4.0.0.
+    """
     jd = None
     with contextlib.suppress(Exception):
         jd = r.json()
@@ -97,7 +133,26 @@ class CurlBackend(BaseBackend):
     async def aget(
         self, url: str, proxy: Proxy, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
     ) -> BackendResponse:
-        """Async GET through *proxy* using :class:`curl_cffi.AsyncSession` (native asyncio)."""
+        """Async GET through ``proxy`` using :class:`curl_cffi.AsyncSession`.
+
+        Args:
+            url (str): Target URL.
+            proxy (Proxy): HTTP or SOCKS proxy.
+            timeout (float): Per-request timeout in seconds; ``<= 0``
+                disables the timeout.
+            **kwargs (Any): Additional curl_cffi options, including the
+                ``impersonate`` browser profile (default ``"chrome"``).
+
+        Returns:
+            BackendResponse: Parsed response.
+
+        Raises:
+            ImportError: When ``curl_cffi`` is not installed.
+            ValueError: When the proxy protocol is unsupported.
+
+        Version:
+            Added in 4.0.0.
+        """
         curl = _import_curl_cffi()
 
         if "http" in proxy.protocol or "socks" in proxy.protocol:
@@ -121,6 +176,24 @@ class CurlBackend(BaseBackend):
     def request_direct(
         self, method: str, url: str, *, timeout: float = DEFAULT_BACKEND_TIMEOUT, **kwargs: Any
     ) -> BackendResponse:
+        """Direct (non-proxied) request using ``curl_cffi.request``.
+
+        Args:
+            method (str): HTTP verb.
+            url (str): Target URL.
+            timeout (float): Timeout seconds.
+            **kwargs (Any): Forwarded to ``curl_cffi.request``;
+                ``impersonate`` defaults to ``"chrome"``.
+
+        Returns:
+            BackendResponse: Parsed response.
+
+        Raises:
+            ImportError: When ``curl_cffi`` is not installed.
+
+        Version:
+            Added in 4.0.0.
+        """
         curl = _import_curl_cffi()
 
         impersonate = kwargs.pop("impersonate", "chrome")

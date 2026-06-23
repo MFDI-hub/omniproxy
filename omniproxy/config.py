@@ -47,28 +47,199 @@ Structure = PoolStructure
 
 # ---------- Protocols (unchanged aside from StateStore) ----------
 class TokenBucketProtocol(Protocol):
-    def consume(self, tokens: int = 1) -> bool: ...
-    def refill(self) -> None: ...
-    def tokens_available(self) -> float: ...
+    """Minimal interface for per-proxy token-bucket rate limiters.
+
+    Implementations are expected to be lightweight and re-entrant from the
+    threads or tasks that the pool runs on.
+
+    Version:
+        Added in 4.0.0.
+    """
+
+    def consume(self, tokens: int = 1) -> bool:
+        """Try to consume tokens from the bucket.
+
+        Args:
+            tokens (int): Number of tokens to remove. Defaults to ``1``.
+
+        Returns:
+            bool: ``True`` if the bucket had enough tokens, ``False`` if the
+            caller should back off.
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
+
+    def refill(self) -> None:
+        """Replenish the bucket according to the implementation's schedule.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
+
+    def tokens_available(self) -> float:
+        """Return the current number of available tokens.
+
+        Returns:
+            float: Approximate token count; implementations may return a
+            fractional value.
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
 
 class MetricsExporter(Protocol):
-    def emit_gauge(self, name: str, value: float, tags: dict[str, str] | None = None) -> None: ...
-    def emit_counter(self, name: str, value: float, tags: dict[str, str] | None = None) -> None: ...
-    def close(self) -> None: ...
+    """Pluggable sink for pool metrics.
+
+    Implementations forward gauges and counters to whatever observability
+    backend the caller prefers (Prometheus, StatsD, OpenTelemetry, etc.).
+
+    Version:
+        Added in 4.0.0.
+    """
+
+    def emit_gauge(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
+        """Emit a gauge sample.
+
+        Args:
+            name (str): Metric name.
+            value (float): Current value.
+            tags (dict[str, str] | None): Optional dimension tags.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
+
+    def emit_counter(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
+        """Emit a counter increment.
+
+        Args:
+            name (str): Metric name.
+            value (float): Increment amount.
+            tags (dict[str, str] | None): Optional dimension tags.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
+
+    def close(self) -> None:
+        """Flush and release exporter resources.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
 
 class StateStore(Protocol):
-    """Key/value store with optional TTL.  Values are strings (*not* only floats)."""
-    def get(self, key: str) -> str | None: ...
-    def set(self, key: str, value: str, ttl: float | None = None) -> None: ...
-    def delete(self, key: str) -> None: ...
+    """Key/value store with optional TTL used for cross-process pool state.
+
+    Values are strings (not necessarily floats) so callers can store JSON
+    blobs or serialized counters as needed.
+
+    Version:
+        Added in 4.0.0.
+    """
+
+    def get(self, key: str) -> str | None:
+        """Read the value stored at ``key``.
+
+        Args:
+            key (str): Lookup key.
+
+        Returns:
+            str | None: The stored value or ``None`` if the key is missing.
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
+
+    def set(self, key: str, value: str, ttl: float | None = None) -> None:
+        """Write a value at ``key`` with optional TTL.
+
+        Args:
+            key (str): Storage key.
+            value (str): String payload to store.
+            ttl (float | None): Optional time-to-live in seconds. When
+                ``None``, the entry is persisted indefinitely.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
+
+    def delete(self, key: str) -> None:
+        """Delete the entry at ``key``.
+
+        Args:
+            key (str): Storage key to remove.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...
 
 # ---------- Helper for warmup_validator ----------
 def bool_to_score(ok: bool) -> float:
-    """Convert a pass/fail boolean to a 0.0/1.0 score."""
+    """Convert a pass/fail boolean into a numeric scoring value.
+
+    A simple adapter for plugging boolean validators into the scoring system,
+    which expects a float in ``[0.0, 1.0]``.
+
+    Args:
+        ok (bool): Whether the underlying check passed.
+
+    Returns:
+        float: ``1.0`` if ``ok`` is truthy, otherwise ``0.0``.
+
+    Version:
+        Added in 4.0.0.
+    """
     return 1.0 if ok else 0.0
 
 # ---------- Sub‑config models (Pydantic v2) ----------
 class ScoringConfig(BaseModel):
+    """Configuration for the latency/success scoring engine.
+
+    Attributes:
+        window_seconds (float): Length of the rolling observation window.
+        decay_factor (float): Exponential decay applied to older samples.
+        success_weight (float): Weight applied to success ratio
+            (must sum to 1.0 with ``latency_weight``).
+        latency_weight (float): Weight applied to inverse-latency
+            (must sum to 1.0 with ``success_weight``).
+        min_samples (int): Minimum samples before scoring becomes active.
+        eviction_threshold (float): Score below which a proxy may be evicted.
+        eviction_grace_period (float): Seconds a low-scoring proxy is given
+            before it is evicted.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     window_seconds: float = 300.0
     decay_factor: float = 0.9
@@ -79,6 +250,20 @@ class ScoringConfig(BaseModel):
     eviction_grace_period: float = 60.0
 
 class CircuitBreakerConfig(BaseModel):
+    """Tuning knobs for the pool-wide :class:`CircuitBreaker`.
+
+    Attributes:
+        window_seconds (float): Sliding-window size for failure counting.
+        failure_ratio (float): Failure ratio in ``(0, 1)`` required to trip.
+        half_open_timeout (float): Seconds the breaker stays OPEN before
+            allowing a single probe in HALF_OPEN.
+        min_throughput (int): Minimum events in the window before the
+            failure ratio is evaluated.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     window_seconds: float = 60.0
     failure_ratio: float = 0.5
@@ -86,6 +271,21 @@ class CircuitBreakerConfig(BaseModel):
     min_throughput: int = 10
 
 class DeadLetterConfig(BaseModel):
+    """Dead-letter queue configuration for chronically failing proxies.
+
+    Attributes:
+        enabled (bool): Toggle the dead-letter pipeline.
+        max_size (int | None): Maximum entries to retain, or ``None`` for
+            unbounded.
+        retry_interval_seconds (float | None): If set, periodically attempt
+            to re-introduce dead-lettered proxies after this many seconds.
+        persistence (DeadLetterPersistence): Where to keep dead-letter
+            state (memory, state store, etc.).
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     max_size: int | None = 1000
@@ -94,6 +294,26 @@ class DeadLetterConfig(BaseModel):
 
 # ---------- HealthCheckConfig (simplified) ----------
 class HealthCheckConfig(BaseModel):
+    """HTTP-based health check definition used during warmup and recovery.
+
+    Attributes:
+        url (str | None): Target URL. ``None`` defers to ``settings.health_check_urls``.
+        method (str): HTTP method, e.g. ``"GET"`` or ``"HEAD"``.
+        expected_status (int | None): Required status code, or ``None`` to skip status check.
+        expected_json_fields (dict[str, Any] | None): Optional JSON body fields
+            that must match for a successful response.
+        timeout (float | None): Per-request timeout in seconds.
+        headers (dict[str, str]): Extra headers to send with the request.
+        recovery_interval (float): Seconds between recovery probes for
+            cooled-down proxies.
+        check_interval (float | None): Periodic check interval; ``None`` disables periodic checks.
+        custom_check (Callable[[Proxy], bool] | None): Replace the HTTP check
+            with a user-supplied callable.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     url: str | None = None
     method: str = "GET"
@@ -106,6 +326,22 @@ class HealthCheckConfig(BaseModel):
     custom_check: Callable[["Proxy"], bool] | None = None
 
 class LimitsConfig(BaseModel):
+    """Per-proxy concurrency and rate limits.
+
+    Attributes:
+        max_connections_per_proxy (int | None): Maximum simultaneous
+            acquisitions of a single proxy.
+        max_rps_per_proxy (float | None): Maximum requests per second per
+            proxy enforced via a token bucket.
+        token_bucket_capacity (float): Capacity (in tokens) for the per-proxy
+            bucket.
+        token_bucket_factory (Callable[[Proxy], Any] | None): Custom factory
+            returning a :class:`TokenBucketProtocol` implementation.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     max_connections_per_proxy: int | None = None
     max_rps_per_proxy: float | None = None
@@ -114,6 +350,17 @@ class LimitsConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_limits(self) -> LimitsConfig:
+        """Ensure ``max_connections_per_proxy`` is at least 1 when set.
+
+        Returns:
+            LimitsConfig: The validated instance.
+
+        Raises:
+            ValueError: If ``max_connections_per_proxy`` is below 1.
+
+        Version:
+            Added in 4.0.0.
+        """
         if (
             self.max_connections_per_proxy is not None
             and self.max_connections_per_proxy < 1
@@ -123,6 +370,51 @@ class LimitsConfig(BaseModel):
 
 # ---------- LifecycleHooks (fully typed) ----------
 class LifecycleHooks(BaseModel):
+    """Optional user callbacks invoked at key points of the pool lifecycle.
+
+    Every hook is optional and defaults to ``None``. The pool catches and
+    logs hook exceptions; failing hooks do not interrupt normal operation.
+
+    Attributes:
+        on_proxy_acquired (Callable[[Proxy], None] | None): Fired when a
+            proxy is checked out.
+        on_proxy_released (Callable[[Proxy], None] | None): Fired when a
+            proxy is returned to the pool.
+        on_proxy_failed (Callable[[Proxy, type | None], None] | None):
+            Fired when a proxy is marked failed; second arg is the exception type.
+        on_proxy_cooled_down (Callable[[Proxy], None] | None): Fired when a
+            proxy enters cooldown.
+        on_proxy_recovered (Callable[[Proxy], None] | None): Fired when a
+            proxy returns to ACTIVE state.
+        on_exhausted (Callable[[], None] | None): Fired when the pool has
+            no usable proxies.
+        on_saturated (Callable[[], None] | None): Fired when per-proxy
+            limits prevent any acquisition.
+        on_check_complete (Callable[[Proxy, CheckResult], None] | None):
+            Fired after each external check call.
+        on_refresh_started (Callable[[], None] | None): Fired before a
+            background refresh.
+        on_refresh_completed (Callable[[int], None] | None): Fired after a
+            refresh, with the number of new proxies added.
+        on_warmup_started (Callable[[], None] | None): Fired before warmup.
+        on_warmup_completed (Callable[[int, int], None] | None): Fired
+            after warmup with ``(passed, total)``.
+        on_circuit_open (Callable[[], None] | None): Fired on breaker OPEN transition.
+        on_circuit_close (Callable[[], None] | None): Fired on breaker CLOSE transition.
+        on_auto_evicted (Callable[[Proxy, str], None] | None): Fired when a
+            proxy is auto-evicted with the reason string.
+        on_session_rebind (Callable[[str, Proxy, Proxy], None] | None):
+            Fired when a sticky session swaps proxies.
+        on_draining (Callable[[], None] | None): Fired when the pool starts draining.
+        on_config_updated (Callable[[set[str]], None] | None): Fired when
+            pool config is hot-reloaded with the set of changed field names.
+        on_dead_letter_added (Callable[[Proxy, str | None], None] | None):
+            Fired when a proxy is added to the dead-letter queue.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     on_proxy_acquired: Callable[["Proxy"], None] | None = None
     on_proxy_released: Callable[["Proxy"], None] | None = None
@@ -146,6 +438,26 @@ class LifecycleHooks(BaseModel):
 
 # ---------- Inner configurators for PoolConfig ----------
 class CooldownConfig(BaseModel):
+    """Cooldown policy for failing proxies.
+
+    Attributes:
+        base (float): Base cooldown duration in seconds.
+        adaptive (bool): When ``True``, consecutive failures grow the
+            cooldown geometrically toward ``max``.
+        min (float): Minimum cooldown floor.
+        max (float): Maximum cooldown ceiling.
+        strategy (Callable[[float, int, int], float] | None): Custom function
+            ``(base, consecutive_failures, total_failures) -> seconds`` that
+            overrides the default adaptive logic.
+        failure_threshold (int): Consecutive failures required before
+            cooldown is applied.
+        penalties (dict[type, float]): Multiplier applied to the cooldown
+            for specific exception types.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     base: float = 300.0
     adaptive: bool = True
@@ -156,6 +468,21 @@ class CooldownConfig(BaseModel):
     penalties: dict[type, float] = Field(default_factory=dict)
 
 class WarmupConfig(BaseModel):
+    """Pool warmup behaviour run at start-up.
+
+    Attributes:
+        enabled (bool): Toggle the warmup phase.
+        min_ready (int): Minimum number of validated proxies required to
+            consider warmup successful.
+        timeout (float): Maximum seconds the warmup phase may take.
+        failure_policy (WarmupFailurePolicy): Action when warmup fails (raise, partial, ignore).
+        validator (Callable[[Proxy], float] | None): Optional custom validator
+            returning a score in ``[0.0, 1.0]``.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     min_ready: int = 0
@@ -164,6 +491,24 @@ class WarmupConfig(BaseModel):
     validator: Callable[["Proxy"], float] | None = None   # float
 
 class RefreshConfig(BaseModel):
+    """Periodic background refresh configuration.
+
+    Attributes:
+        sync_callback (Callable[[], list[Proxy]] | None): Synchronous
+            refresh source.
+        async_callback (Callable[[], Awaitable[list[Proxy]]] | None):
+            Asynchronous refresh source.
+        fallback_sync_callbacks (list[Callable[[], list[Proxy]]]): Sync
+            fallbacks tried in order when the primary fails.
+        fallback_async_callbacks (list[Callable[[], Awaitable[list[Proxy]]]]):
+            Async fallbacks tried in order when the primary fails.
+        timeout (float): Maximum seconds for a refresh attempt.
+        interval_seconds (float): Period between refresh attempts.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     sync_callback: Callable[[], list["Proxy"]] | None = None
     async_callback: Callable[[], Awaitable[list["Proxy"]]] | None = None
@@ -173,13 +518,43 @@ class RefreshConfig(BaseModel):
     interval_seconds: float = 300.0
 
 class SessionConfig(BaseModel):
+    """Sticky session configuration.
+
+    Attributes:
+        ttl (float): Session lifetime in seconds before the binding expires.
+        cooldown_policy (SessionCooldownPolicy): What to do when a sticky
+            proxy enters cooldown (rebind, block, etc.).
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(extra="forbid")
     ttl: float = 300.0
     cooldown_policy: SessionCooldownPolicy = SessionCooldownPolicy.REBIND
 
 # ---------- Global config (Pydantic v2, frozen) ----------
 class GlobalConfig(BaseModel):
-    """Immutable, thread‑safe process‑wide defaults.  Use the module‑level ``settings`` singleton."""
+    """Immutable, thread-safe process-wide defaults.
+
+    Use the module-level :data:`settings` singleton instead of instantiating
+    this directly; the singleton is frozen so mutation requires constructing
+    a new instance.
+
+    Attributes:
+        default_backend (str): Default HTTP backend identifier (e.g.
+            ``"httpx"``, ``"requests"``, ``"curl_cffi"``).
+        default_timeout (float | None): Default request timeout in seconds.
+        default_connect_timeout (float | None): Default connection timeout.
+        default_check_urls (tuple[str, ...]): URLs used by the standard checkers.
+        default_check_info_url_templates (tuple[str, ...]): Templates used
+            for IP-info checks (e.g. anonymity classification).
+        health_check_urls (tuple[str, ...]): URLs used by pool health checks.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     default_backend: str = DEFAULT_BACKEND
@@ -192,6 +567,20 @@ class GlobalConfig(BaseModel):
     @field_validator("default_backend")
     @classmethod
     def _validate_backend(cls, v: str) -> str:
+        """Normalize and validate the backend identifier.
+
+        Args:
+            v (str): Raw backend name (e.g. ``"curlcffi"``).
+
+        Returns:
+            str: Normalized backend key as registered in :data:`VALID_BACKENDS`.
+
+        Raises:
+            ValueError: If the backend is not recognised.
+
+        Version:
+            Added in 4.0.0.
+        """
         key = v.lower().replace("-", "_")
         if key == "curlcffi":
             key = "curl_cffi"
@@ -202,6 +591,22 @@ class GlobalConfig(BaseModel):
     @field_validator("default_timeout", "default_connect_timeout")
     @classmethod
     def _validate_timeout(cls, v: float | None, info) -> float | None:
+        """Validate that timeouts are positive numbers or ``None``.
+
+        Args:
+            v (float | None): Candidate timeout in seconds.
+            info: Pydantic field info; used to produce field-specific errors.
+
+        Returns:
+            float | None: The coerced timeout or ``None``.
+
+        Raises:
+            TypeError: If ``v`` is not numeric.
+            ValueError: If ``v`` is not strictly positive.
+
+        Version:
+            Added in 4.0.0.
+        """
         if v is not None:
             if not isinstance(v, (int, float)) or isinstance(v, bool):
                 raise TypeError(f"{info.field_name} must be a number or None")
@@ -213,6 +618,22 @@ class GlobalConfig(BaseModel):
     @field_validator("default_check_urls", "default_check_info_url_templates", "health_check_urls")
     @classmethod
     def _validate_url_tuples(cls, v: tuple[str, ...], info) -> tuple[str, ...]:
+        """Validate that URL tuples contain non-empty strings only.
+
+        Args:
+            v (tuple[str, ...]): Raw URL collection.
+            info: Pydantic field info used in error messages.
+
+        Returns:
+            tuple[str, ...]: Frozen tuple of validated URLs.
+
+        Raises:
+            TypeError: If the value is not a list or tuple.
+            ValueError: If any element is not a non-empty string.
+
+        Version:
+            Added in 4.0.0.
+        """
         if not isinstance(v, (list, tuple)):
             raise TypeError(f"{info.field_name} must be a list/tuple")
         for i, item in enumerate(v):
@@ -222,7 +643,17 @@ class GlobalConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_config(self) -> GlobalConfig:
-        # default_check_urls must not be empty
+        """Cross-field validation for :class:`GlobalConfig`.
+
+        Returns:
+            GlobalConfig: The validated instance.
+
+        Raises:
+            ValueError: If ``default_check_urls`` is empty.
+
+        Version:
+            Added in 4.0.0.
+        """
         if not self.default_check_urls:
             raise ValueError("default_check_urls must be non‑empty")
         return self
@@ -232,11 +663,65 @@ settings = GlobalConfig()
 
 # ---------- PoolConfig (simplified orchestrator) ----------
 class PoolConfig(BaseModel):
-    """Top‑level proxy‑pool configuration.
+    """Top-level proxy-pool configuration.
 
-    All behavioural details are delegated to sub‑config models;
-    only fields that cannot be cleanly grouped elsewhere remain here.
+    All behavioural details are delegated to sub-config models; only fields
+    that cannot be cleanly grouped elsewhere remain here. Instances are
+    frozen, so apply changes by building a new ``PoolConfig`` via
+    ``model_copy(update=...)``.
+
+    Attributes:
+        strategy (PoolStrategy): How the pool picks the next proxy.
+        structure (PoolStructure): Underlying container type.
+        cooldown (CooldownConfig): Cooldown policy.
+        warmup (WarmupConfig): Warmup behaviour.
+        refresh (RefreshConfig): Background refresh sources.
+        session (SessionConfig): Sticky session behaviour.
+        limits (LimitsConfig): Per-proxy rate and connection limits.
+        hooks (LifecycleHooks): User callbacks for lifecycle events.
+        health_check (HealthCheckConfig | None): Optional health-check spec.
+        scoring (ScoringConfig | None): Optional scoring engine config.
+        circuit_breaker (CircuitBreakerConfig | None): Optional breaker config.
+        dead_letter (DeadLetterConfig): Dead-letter pipeline.
+        acquire_timeout (float): Acquire wait policy. ``0`` returns immediately
+            after on-demand refresh, ``>0`` waits up to that many seconds,
+            ``<0`` waits forever.
+        wait_fallback_interval (float): Polling interval used as a fallback
+            when condition variables cannot be used.
+        filter_missing_metadata (FilterMissingMetadata): How to handle
+            proxies that lack required metadata at acquisition time.
+        accept_callback (Callable[[Proxy, dict], bool] | None): Custom
+            acceptance predicate invoked at acquisition.
+        auto_mark_failed_on_exception (bool): Mark proxy failed when an
+            unhandled exception leaves the ``with`` block.
+        auto_mark_success_on_exit (bool): Mark proxy success on clean exit.
+        reraise (bool): Whether to re-raise exceptions from ``with`` blocks.
+        dedup_key (Callable[[Proxy], str] | None): Custom dedup key function.
+        acquire_tags (set[str] | None): Restrict acquisitions to proxies
+            carrying any of these tags.
+        use_rotation_urls (bool): Call the proxy's rotation URL on acquire.
+        rotate_on_acquire (bool): Rotate the proxy on acquisition.
+        rotate_on_failure (bool): Rotate the proxy after a failure.
+        backend_override (Callable[[Proxy], str | None] | None): Choose a
+            backend per-proxy.
+        drain_timeout (float): Seconds to wait for in-flight acquisitions
+            during shutdown.
+        min_size (int | None): Lower bound on proxy count.
+        max_size (int | None): Upper bound on proxy count.
+        ignore_exceptions (tuple[type, ...]): Exceptions ignored for
+            cooldown accounting.
+        proxy_failure_classifier (Callable[[BaseException, Optional[Proxy]], bool] | None):
+            Custom predicate marking exceptions as "proxy failures".
+        metrics_exporter (Any | None): Optional :class:`MetricsExporter`.
+        log_level (int): Standard ``logging`` level for the pool's logger.
+        state_store_factory (Callable[[], Any] | None): Factory returning a
+            :class:`StateStore` instance.
+        extra (dict[str, Any]): Free-form extension dictionary.
+
+    Version:
+        Added in 4.0.0.
     """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     strategy: PoolStrategy = PoolStrategy.ROUND_ROBIN
@@ -279,6 +764,24 @@ class PoolConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_pool_config(self) -> PoolConfig:
+        """Cross-field validation for :class:`PoolConfig`.
+
+        Verifies that scoring weights sum to ``1.0``, warmup has a health
+        check, cooldown bounds are sane, refresh timing is sensible, sizes
+        are non-negative, dead-letter values are valid, the circuit breaker
+        configuration is in range, and that score-dependent strategies have
+        a scoring config. Emits warnings for soft inconsistencies
+        (e.g. rotation URLs without ``rotate_on_acquire``).
+
+        Returns:
+            PoolConfig: The validated instance.
+
+        Raises:
+            ValueError: If any constraint is violated.
+
+        Version:
+            Added in 4.0.0.
+        """
         # scoring weights
         s = self.scoring
         if s is not None and abs(s.success_weight + s.latency_weight - 1.0) > 1e-9:
@@ -366,6 +869,19 @@ class PoolConfig(BaseModel):
     # ---------- Presets (now exhaustive) ----------
     @classmethod
     def scraping_preset(cls) -> PoolConfig:
+        """Preset tuned for high-volume web scraping.
+
+        Uses round-robin selection, moderate cooldown, generous concurrency,
+        adaptive scoring with relatively quick eviction, and an
+        opinionated circuit breaker. Warmup is disabled because scraping
+        traffic itself is the validation signal.
+
+        Returns:
+            PoolConfig: Frozen configuration ready to pass to a pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         return cls(
             strategy=PoolStrategy.ROUND_ROBIN,
             cooldown=CooldownConfig(base=120.0, adaptive=True, min=15.0, max=300.0,
@@ -390,6 +906,18 @@ class PoolConfig(BaseModel):
 
     @classmethod
     def api_gateway_preset(cls) -> PoolConfig:
+        """Preset tuned for API gateway / structured-API workloads.
+
+        Uses weighted selection driven by scoring, conservative concurrency,
+        long cooldowns, mandatory warmup against a health check, and strict
+        metadata validation so misconfigured proxies fail fast.
+
+        Returns:
+            PoolConfig: Frozen configuration ready to pass to a pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         return cls(
             strategy=PoolStrategy.WEIGHTED,
             cooldown=CooldownConfig(base=600.0, adaptive=True, min=120.0, max=1800.0,
@@ -412,6 +940,18 @@ class PoolConfig(BaseModel):
 
     @classmethod
     def stealth_preset(cls) -> PoolConfig:
+        """Preset tuned for stealthy, low-rate browsing.
+
+        Picks the lowest-latency proxy, applies aggressive cooldown
+        penalties, rotates on acquire, and forces strict metadata to mimic
+        a small number of careful clients.
+
+        Returns:
+            PoolConfig: Frozen configuration ready to pass to a pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         return cls(
             strategy=PoolStrategy.LOWEST_LATENCY,
             cooldown=CooldownConfig(base=900.0, adaptive=False, min=300.0, max=3600.0,
@@ -436,6 +976,18 @@ class PoolConfig(BaseModel):
 
     @classmethod
     def rotating_residential_preset(cls) -> PoolConfig:
+        """Preset tuned for rotating residential proxies.
+
+        Uses random selection (each acquire yields a new IP via the
+        rotation URL), moderate cooldown, and skips warmup since rotation
+        provides a fresh endpoint every call.
+
+        Returns:
+            PoolConfig: Frozen configuration ready to pass to a pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         return cls(
             strategy=PoolStrategy.RANDOM,
             cooldown=CooldownConfig(base=180.0, adaptive=True, min=30.0, max=600.0,
@@ -459,6 +1011,18 @@ class PoolConfig(BaseModel):
 
     @classmethod
     def load_balancer_preset(cls) -> PoolConfig:
+        """Preset tuned for round-robin load balancing behind a fleet of proxies.
+
+        Disables scoring and the circuit breaker, relies on quick recovery
+        via health checks, and ignores proxies with missing metadata so it
+        is forgiving toward heterogeneous fleets.
+
+        Returns:
+            PoolConfig: Frozen configuration ready to pass to a pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         return cls(
             strategy=PoolStrategy.ROUND_ROBIN,
             cooldown=CooldownConfig(base=30.0, adaptive=False, failure_threshold=1),

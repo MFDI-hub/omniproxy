@@ -10,9 +10,25 @@ if TYPE_CHECKING:
     from .config import LifecycleHooks
 
 async def run_deferred(deferred: list[tuple[str, tuple]], hooks: LifecycleHooks) -> None:
-    """Execute *deferred* hook calls outside the main state lock.
+    """Execute deferred lifecycle hook calls outside the main state lock.
 
-    Each entry is ``(hook_name, args)``.  Errors are logged but not re‑raised.
+    Pool internals collect hook invocations while holding their state lock,
+    then schedule this coroutine to actually run them once the lock is
+    released. Both synchronous callables and coroutine functions are
+    supported. Hook exceptions are logged but never re-raised, so a buggy
+    hook cannot break the pool.
+
+    Args:
+        deferred (list[tuple[str, tuple]]): Ordered list of
+            ``(hook_name, args)`` pairs. ``hook_name`` must match an
+            attribute on ``hooks``; ``args`` is forwarded positionally.
+        hooks (LifecycleHooks): Container of hook callables.
+
+    Returns:
+        None
+
+    Version:
+        Added in 4.0.0.
     """
     import logging
     logger: Logger = logging.getLogger(name=__name__)

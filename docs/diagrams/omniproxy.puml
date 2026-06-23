@@ -1,0 +1,342 @@
+@startuml omniproxy-overview
+!theme plain
+title omniproxy — package overview
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "omniproxy (public API)" as api {
+  [__init__.py] as init
+}
+
+package "core model" as core {
+  [proxy.py\nProxy, ProxyPattern] as proxy_mod
+  [extended_proxy.py\nProxy, CheckResult\ncheck_* / acheck_*] as ext_proxy
+  [enum.py] as enum_mod
+  [constants.py] as constants
+  [utils.py\nOmniproxyParser] as utils
+}
+
+package "configuration" as cfg {
+  [config.py\nGlobalConfig, PoolConfig\n+ sub-configs] as config
+}
+
+package "pooling" as pool_pkg {
+  [pool.py\nAsyncProxyPool\nSyncProxyPool] as pool
+  [strategies.py] as strategies
+  [scoring.py] as scoring
+  [cooldown.py] as cooldown
+  [circuit_breaker.py] as circuit
+  [session.py] as session
+  [dead_letter.py] as dead_letter
+  [warmup.py] as warmup
+  [refresh.py] as refresh
+  [hooks.py] as hooks
+  [metrics.py] as metrics
+}
+
+package "I/O" as io_pkg {
+  [io.py\nread/save/fetch] as io
+}
+
+package "fetchers" as fetchers {
+  [fetchers/base.py\nProxyFetcher] as fetcher_proto
+  [file_fetcher.py\nFileFetcher] as file_fetcher
+  [url_fetcher.py\nURLFetcher] as url_fetcher
+  [scrape_fetcher.py\nScrapeFetcher] as scrape_fetcher
+}
+
+package "backends" as backends {
+  [backends/base.py\nBaseBackend] as backend_base
+  [factory.py\nget_backend] as factory
+  [httpx_client.py] as httpx_b
+  [aiohttp_client.py] as aiohttp_b
+  [requests_client.py] as requests_b
+  [curl_client.py] as curl_b
+  [tls_client.py] as tls_b
+}
+
+package "errors & CLI" as misc {
+  [errors.py] as errors
+  [cli.py] as cli
+  [client.py\nlazy httpx] as client_lazy
+}
+
+init --> ext_proxy
+init --> pool
+init --> io
+init --> config
+
+ext_proxy --|> proxy_mod : extends
+pool --> ext_proxy : uses Proxy
+pool --> config : PoolConfig
+pool --> strategies
+pool --> scoring
+pool --> cooldown
+pool --> circuit
+pool --> session
+pool --> dead_letter
+pool --> fetcher_proto
+pool --> refresh
+pool --> warmup
+
+refresh --> fetcher_proto
+io --> ext_proxy
+
+factory --> backend_base
+httpx_b --|> backend_base
+aiohttp_b --|> backend_base
+requests_b --|> backend_base
+curl_b --|> backend_base
+tls_b --|> backend_base
+
+ext_proxy --> factory : health checks
+file_fetcher ..|> fetcher_proto
+url_fetcher ..|> fetcher_proto
+scrape_fetcher ..|> fetcher_proto
+
+@enduml
+
+
+@startuml omniproxy-classes
+!theme plain
+title omniproxy — core classes
+skinparam classAttributeIconSize 0
+
+abstract class BaseBackend {
+  +name: str
+  +get(url, proxy, timeout, **kwargs): BackendResponse
+  +aget(url, proxy, timeout, **kwargs): BackendResponse
+}
+
+class BackendResponse {
+  +status_code: int
+  +headers: Mapping
+  +json_data: Any
+  +text: str
+}
+
+class Proxy <<proxy.py>> {
+  +protocol, ip, port
+  +username, password
+  +metadata slots
+  +validate(s): Proxy
+  +playwright: PlaywrightProxySettings
+}
+
+class ExtendedProxy <<extended_proxy.py>> {
+  +get_info(), check()
+  +get_client(), get_async_client()
+}
+ExtendedProxy --|> Proxy
+
+class CheckResult {
+  +ok: bool
+  +latency_ms: float
+  +status_code: int
+  +headers, json_data
+  +anonymity, country, ...
+}
+
+class PoolConfig {
+  +strategy: PoolStrategy
+  +cooldown, warmup, refresh
+  +session, limits, hooks
+  +health_check, scoring
+  +circuit_breaker, dead_letter
+}
+
+class GlobalConfig {
+  +default_backend
+  +check URLs, timeouts
+}
+note right of GlobalConfig : singleton `settings`
+
+class AsyncProxyPool {
+  -_proxies: deque[Proxy]
+  -_scores: dict[str, EMAState]
+  -_cooldown_until: dict
+  -_pending_session_rebind: dict
+  -_refresh_needed: bool
+  -_half_open_probe_epoch: int | None
+  -_half_open_probe_url: str | None
+  -_circuit_breaker: CircuitBreaker
+  -_strategy: SelectionStrategy
+  +acquire(**filters): Proxy
+  +release(proxy)
+  +mark_success(proxy, latency?)
+  +mark_failed(proxy, exc?)
+  +statistics: PoolStatistics
+}
+
+class SyncProxyPool {
+  wraps AsyncProxyPool\n(thread + event loop)
+  +__del__() best-effort close
+}
+
+class AcquireOptions {
+  +tags, country
+  +min_anonymity
+  +session_key
+}
+
+class PoolStatistics {
+  +served, failed
+  +released, exhausted_count
+}
+
+class CircuitBreaker {
+  +state: CircuitBreakerState
+  +active_probe_epoch: int | None
+  +record_success(probe_epoch?)
+  +record_failure(probe_epoch?)
+  +allow_request(): bool
+  -_expire_stale_probe()
+  -_probe_started_at: float | None
+}
+
+class EMAState {
+  +success_ema, latency_ema
+  +sample_count
+}
+
+interface SelectionStrategy {
+  +select(eligible, scores, context): Proxy
+}
+
+note right of SelectionStrategy
+  context = full pool deque
+  (RoundRobin uses it for
+  fair rotation)
+end note
+
+class RoundRobinStrategy
+class RandomStrategy
+class WeightedStrategy
+class LowestLatencyStrategy
+
+RoundRobinStrategy ..|> SelectionStrategy
+RandomStrategy ..|> SelectionStrategy
+WeightedStrategy ..|> SelectionStrategy
+LowestLatencyStrategy ..|> SelectionStrategy
+
+interface ProxyFetcher {
+  +fetch(): list[Proxy | str]
+}
+
+class FileFetcher
+class URLFetcher
+class ScrapeFetcher
+
+FileFetcher ..|> ProxyFetcher
+URLFetcher ..|> ProxyFetcher
+ScrapeFetcher ..|> ProxyFetcher
+
+class HttpxBackend
+class AiohttpBackend
+class RequestsBackend
+class CurlBackend
+class TlsClientBackend
+
+HttpxBackend --|> BaseBackend
+AiohttpBackend --|> BaseBackend
+RequestsBackend --|> BaseBackend
+CurlBackend --|> BaseBackend
+TlsClientBackend --|> BaseBackend
+
+BaseBackend ..> BackendResponse : returns
+BaseBackend ..> Proxy : routes via
+
+AsyncProxyPool *-- PoolConfig
+AsyncProxyPool o-- ProxyFetcher
+AsyncProxyPool --> SelectionStrategy
+AsyncProxyPool --> CircuitBreaker
+AsyncProxyPool --> EMAState
+AsyncProxyPool ..> AcquireOptions
+AsyncProxyPool *-- PoolStatistics
+SyncProxyPool --> AsyncProxyPool
+
+ExtendedProxy ..> CheckResult : produces
+ExtendedProxy ..> BaseBackend : via get_backend()
+
+note bottom of AsyncProxyPool
+  acquire → check availability
+  (circuit-open: retry within timeout)
+  → filter → strategy.select
+  (context = full _proxies deque)
+  → limits / cooldown / circuit breaker
+  → optional session bind / rebind hook
+  mark_success OR release (not both)
+  health checks do NOT feed breaker
+  min_size → _refresh_needed flag
+end note
+
+@enduml
+
+
+@startuml omniproxy-acquire-sequence
+!theme plain
+title omniproxy — AsyncProxyPool.acquire (simplified)
+autonumber
+
+actor Caller
+participant "AsyncProxyPool" as Pool
+participant "SelectionStrategy" as Strat
+participant "CircuitBreaker" as CB
+database "deque[Proxy]" as Q
+
+Caller -> Pool : acquire(**filters)
+activate Pool
+
+Pool -> Pool : await ready event;\ncheck closed / draining
+loop until proxy or timeout
+  Pool -> CB : allow_request()?
+  alt circuit open (denied)
+    CB --> Pool : no
+    Pool -> Pool : wait within acquire_timeout\n(or raise if budget exhausted)
+  else circuit allows
+    CB --> Pool : yes
+    Pool -> Pool : build eligible list\n(skip cooldown, limits, filters,\nsession resolve + rebind stash)
+    Pool -> Strat : select(eligible, scores, _proxies)
+    Strat --> Pool : Proxy | None
+
+    alt proxy found
+      Pool -> Pool : increment connections,\ntag probe epoch+url if HALF_OPEN,\nrun hooks, session bind,\non_session_rebind if pending
+      Pool --> Caller : Proxy
+    else no proxy
+      Pool -> Pool : wait on Condition,\non-demand refresh (once max),\nor raise
+    end
+  end
+end
+
+deactivate Pool
+
+Caller -> Pool : mark_success(proxy) **or** release(proxy)
+note right: mark_success releases lease;\nrelease clears probe tag\nonly for probe proxy URL;\ndo not call both
+Caller -> Pool : mark_failed(proxy, exc?) on error
+note right: mark_success/mark_failed\nfeed circuit breaker\n(with probe_epoch in HALF_OPEN)
+
+@enduml
+
+
+@startuml omniproxy-check-flow
+!theme plain
+title omniproxy — proxy health check
+autonumber
+
+participant Caller
+participant "check_proxy /\nacheck_proxy" as Check
+participant "get_backend()" as Factory
+participant "BaseBackend" as BE
+participant "Proxy" as P
+
+Caller -> Check : check_proxy(proxy, url=...)
+Check -> Factory : get_backend(name)
+Factory --> Check : HttpxBackend | ...
+Check -> BE : get(url, proxy) / aget(...)
+BE -> P : route HTTP via proxy URL
+BE --> Check : BackendResponse
+Check -> Check : classify anonymity,\nlatency, retries
+Check --> Caller : CheckResult
+Caller -> P : apply_check_result_metadata(result)
+
+@enduml

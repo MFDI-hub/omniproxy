@@ -24,7 +24,7 @@ from .errors import (
     SessionBrokenError,
     WarmupFailedError,
 )
-from .proxy import Proxy
+from .extended_proxy import Proxy
 from .cooldown import compute_cooldown, is_in_cooldown
 from .circuit_breaker import CircuitBreaker, CircuitBreakerState
 from .scoring import EMAState, update_ema
@@ -41,7 +41,27 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class AcquireOptions:
-    """Transient filter options for :meth:`AsyncProxyPool.acquire`."""
+    """Transient filter options for :meth:`AsyncProxyPool.acquire`.
+
+    Used to narrow which proxies are considered for one acquisition.
+    Instances are built either directly or via :meth:`from_kwargs`, which
+    knows how to merge in pool-level defaults.
+
+    Attributes:
+        tags (set[str] | None): Restrict acquisitions to proxies whose
+            ``tags`` set intersects this collection.
+        country (str | None): Require a specific country code/name on the
+            proxy metadata.
+        min_anonymity (str | None): Minimum anonymity tier
+            (``transparent`` < ``anonymous`` < ``elite``).
+        session_key (str | None): Sticky-session identifier.
+        accept_callback (Any): Optional predicate
+            ``Callable[[Proxy], bool]`` for custom acceptance.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     tags: set[str] | None = None
     country: str | None = None
     min_anonymity: str | None = None
@@ -50,6 +70,23 @@ class AcquireOptions:
 
     @classmethod
     def from_kwargs(cls, config: PoolConfig, **filters: Any) -> AcquireOptions:
+        """Build :class:`AcquireOptions` from kwargs, applying pool defaults.
+
+        Accepts both ``session_key`` and the legacy ``session_id`` alias.
+        Unknown keys are logged at WARNING level and discarded. Pool-level
+        ``acquire_tags`` and ``accept_callback`` are inherited when the
+        caller does not override them.
+
+        Args:
+            config (PoolConfig): Pool configuration providing defaults.
+            **filters (Any): Caller-supplied filter kwargs.
+
+        Returns:
+            AcquireOptions: Merged options ready for one acquisition.
+
+        Version:
+            Added in 4.0.0.
+        """
         if "session_key" not in filters and "session_id" in filters:
             filters = dict(filters)
             filters["session_key"] = filters.pop("session_id")
@@ -72,7 +109,19 @@ class AcquireOptions:
 
 @dataclass
 class PoolStatistics:
-    """Simple counters for observability."""
+    """Simple monotonic counters for pool observability.
+
+    Attributes:
+        served (int): Number of proxies handed out by ``acquire``.
+        failed (int): Number of acquisitions that ended in failure.
+        released (int): Number of proxies returned via ``release``.
+        exhausted_count (int): Number of times ``acquire`` raised
+            :exc:`PoolExhausted` or a related error.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     served: int = 0
     failed: int = 0
     released: int = 0
@@ -80,21 +129,49 @@ class PoolStatistics:
 
 
 class AsyncProxyPool:
-    """Asynchronous, thread‑safe proxy pool with health, scoring, circuit breaker.
+    """Asynchronous, thread-safe proxy pool.
 
-    Must be used as an async context manager::
+    Owns the proxy collection, scoring engine, circuit breaker, dead-letter
+    queue, health-check loop and background refresh tasks. Must be used as
+    an async context manager so background workers can be started and
+    cleanly stopped::
 
         async with AsyncProxyPool(config, fetchers=[...]) as pool:
             proxy = await pool.acquire()
-            ...
+            try:
+                ...
+            finally:
+                await pool.release(proxy)
+
+    The pool is safe to use from multiple coroutines within the same loop;
+    use :class:`SyncProxyPool` to bridge into synchronous code.
+
+    Attributes:
+        statistics (PoolStatistics): Live observability counters (read-only
+            via property).
+
+    Version:
+        Added in 4.0.0.
     """
 
     def __init__(
         self,
         config: PoolConfig,
-        initial_proxies: list[Proxy] = (),
+        initial_proxies: list[Proxy] = [],
         fetchers: list[ProxyFetcher] | None = None,
     ) -> None:
+        """Build the pool with the given config, seed proxies, and fetchers.
+
+        Args:
+            config (PoolConfig): Frozen pool configuration.
+            initial_proxies (list[Proxy]): Optional seed proxies. Strings
+                are coerced through :class:`Proxy`.
+            fetchers (list[ProxyFetcher] | None): Optional list of fetchers
+                used by the refresh loop.
+
+        Version:
+            Added in 4.0.0.
+        """
         self._config: PoolConfig = config
         self._fetchers = fetchers or []
         self._state_lock = asyncio.Lock()
@@ -126,6 +203,10 @@ class AsyncProxyPool:
         self._bg_refresh: asyncio.Task | None = None
         self._bg_metrics: asyncio.Task | None = None
         self._half_open_probe_epoch: int | None = None
+        self._half_open_probe_url: str | None = None
+        self._half_open_probe_proxy: Proxy | None = None
+        self._refresh_needed = False
+        self._refresh_generation = 0
 
         if config.health_check:
             self._health_sem = asyncio.Semaphore(
@@ -140,13 +221,56 @@ class AsyncProxyPool:
             self._proxies.append(p)
 
     async def __aenter__(self) -> AsyncProxyPool:
+        """Start background workers and run warmup (if enabled).
+
+        Returns:
+            AsyncProxyPool: The pool ready to serve acquisitions.
+
+        Raises:
+            PoolClosedError: If the pool has already been closed.
+            WarmupFailedError: When warmup fails and the configured failure
+                policy is :attr:`WarmupFailurePolicy.RAISE`.
+
+        Version:
+            Added in 4.0.0.
+        """
         await self._start()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
+        """Stop background workers and drain in-flight acquisitions.
+
+        Args:
+            exc_type: Exception type if the ``with`` block raised.
+            exc: Exception instance if the ``with`` block raised.
+            tb: Traceback if the ``with`` block raised.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         await self._close()
 
     async def _start(self) -> None:
+        """Spawn background workers and run optional warmup.
+
+        Called by :meth:`__aenter__`. Idempotent: a second call after the
+        pool is ready is a no-op. Any failure during startup triggers a
+        clean shutdown and re-raises.
+
+        Returns:
+            None
+
+        Raises:
+            PoolClosedError: If the pool has already been closed.
+            WarmupFailedError: When warmup fails and the configured failure
+                policy is :attr:`WarmupFailurePolicy.RAISE`.
+
+        Version:
+            Added in 4.0.0.
+        """
         if self._closed:
             raise PoolClosedError("Pool is closed")
         if self._ready.is_set():
@@ -209,6 +333,14 @@ class AsyncProxyPool:
             raise
 
     async def _stop_background_tasks(self) -> None:
+        """Cancel and await all background tasks (health, refresh, metrics).
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         tasks = [
             t
             for t in [self._bg_health, self._bg_dead, self._bg_refresh, self._bg_metrics]
@@ -227,6 +359,18 @@ class AsyncProxyPool:
         self._bg_metrics = None
 
     async def _close(self) -> None:
+        """Drain in-flight acquisitions and stop the pool.
+
+        Sets the draining flag, waits up to ``config.drain_timeout`` for
+        outstanding acquisitions to return, then cancels background tasks.
+        Idempotent.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         async with self._close_lock:
             if self._closed:
                 return
@@ -259,15 +403,37 @@ class AsyncProxyPool:
 
             self._closed = True
             async with self._state_lock:
+                self._pending_session_rebind.clear()
                 self._available_cond.notify_all()
             await self._stop_background_tasks()
 
     async def close(self) -> None:
-        """Shut down background workers (idempotent)."""
+        """Shut down background workers and drain in-flight acquisitions.
+
+        Public alias for the internal :meth:`_close`. Safe to call multiple
+        times; subsequent invocations are no-ops.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         await self._close()
 
     @staticmethod
     def _build_strategy(strategy: PoolStrategy) -> SelectionStrategy:
+        """Instantiate the :class:`SelectionStrategy` for the given enum value.
+
+        Args:
+            strategy (PoolStrategy): Strategy identifier.
+
+        Returns:
+            SelectionStrategy: Newly constructed strategy instance.
+
+        Version:
+            Added in 4.0.0.
+        """
         from .strategies import (
             RoundRobinStrategy,
             RandomStrategy,
@@ -283,6 +449,22 @@ class AsyncProxyPool:
         return mapping[strategy]()
 
     def _append_circuit_hooks(self, deferred: list[tuple[str, tuple]]) -> None:
+        """Queue circuit-breaker hook invocations onto ``deferred``.
+
+        Drains pending transitions from the breaker and appends
+        ``on_circuit_open`` / ``on_circuit_close`` entries when their
+        callbacks are configured.
+
+        Args:
+            deferred (list[tuple[str, tuple]]): Hook-invocation buffer that
+                will be passed to :func:`run_deferred`.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if not self._circuit_breaker:
             return
         for transition in self._circuit_breaker.drain_pending_transitions():
@@ -292,6 +474,23 @@ class AsyncProxyPool:
                 deferred.append(("on_circuit_close", ()))
 
     def _bounded_wait_timeout(self, remaining: float | None) -> float:
+        """Compute a polling wait that respects cooldown wake-ups and the user budget.
+
+        Used as a fallback when ``Condition.wait`` would otherwise block
+        indefinitely. Picks the smallest of the fallback interval, the
+        caller's remaining budget, and the time until the next cooldown
+        expires.
+
+        Args:
+            remaining (float | None): Remaining caller budget in seconds,
+                or ``None`` to wait without an upper bound.
+
+        Returns:
+            float: Wait duration in seconds, at least ``0.001``.
+
+        Version:
+            Added in 4.0.0.
+        """
         interval = self._config.wait_fallback_interval
         if interval <= 0:
             interval = 0.25
@@ -306,6 +505,18 @@ class AsyncProxyPool:
         return max(wait_time, 0.001)
 
     async def _wait_for_availability(self, remaining: float | None) -> None:
+        """Wait on the availability condition for a bounded duration.
+
+        Args:
+            remaining (float | None): Caller-remaining budget. ``None`` means
+                rely solely on cooldown/fallback interval bounds.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         wait_time = self._bounded_wait_timeout(remaining)
         try:
             await asyncio.wait_for(self._available_cond.wait(), wait_time)
@@ -313,7 +524,23 @@ class AsyncProxyPool:
             pass
 
     def _return_lease(self, proxy: Proxy, *, count_release_stat: bool) -> None:
-        """Idempotently release one acquire lease for *proxy*."""
+        """Release one acquire lease for ``proxy``.
+
+        Idempotent: when no leases are outstanding the call is a no-op.
+        Notifies the availability condition so waiters can pick up the
+        slot.
+
+        Args:
+            proxy (Proxy): Proxy whose lease should be released.
+            count_release_stat (bool): When ``True`` increments
+                ``PoolStatistics.released``.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         current = self._connections.get(proxy.url, 0)
         if current <= 0:
             return
@@ -323,6 +550,38 @@ class AsyncProxyPool:
         self._available_cond.notify_all()
 
     async def acquire(self, **filters: Any) -> Proxy:
+        """Acquire one proxy from the pool, blocking up to ``acquire_timeout``.
+
+        Honours pool-wide policies: filters, sticky sessions, cooldown,
+        per-proxy connection limits, the circuit breaker, on-demand
+        refresh, and lifecycle hooks. The returned proxy must be released
+        with :meth:`release` (or :meth:`mark_failed` / :meth:`mark_success`).
+
+        Args:
+            **filters (Any): Acquire-time filters forwarded to
+                :meth:`AcquireOptions.from_kwargs`. Common keys include
+                ``tags``, ``country``, ``min_anonymity``, ``session_key``
+                and ``accept_callback``.
+
+        Returns:
+            Proxy: Acquired proxy.
+
+        Raises:
+            PoolClosedError: Pool has been closed.
+            PoolDrainingError: Pool is shutting down.
+            PoolCircuitOpenError: Circuit breaker is shedding traffic.
+            PoolExhausted: No usable proxies available within the budget.
+            PoolSaturated: Matching proxies exist but all hit connection
+                caps or cooldowns.
+            NoMatchingProxy: Filters exclude every available proxy.
+            MissingProxyMetadata: ``filter_missing_metadata='raise'`` and a
+                required metadata field is missing on every candidate.
+            SessionBrokenError: Sticky session policy raised on invalid
+                binding.
+
+        Version:
+            Added in 4.0.0.
+        """
         await self._ready.wait()
         options = AcquireOptions.from_kwargs(self._config, **filters)
         deferred: list[tuple[str, tuple]] = []
@@ -330,30 +589,38 @@ class AsyncProxyPool:
         timeout = self._config.acquire_timeout
         start_time = loop.time()
         proxy: Proxy | None = None
+        did_on_demand_refresh = False
 
         while True:
             should_refresh = False
+            circuit_open = False
+            circuit_exc: PoolCircuitOpenError | None = None
             exhausted_hooks: list[tuple[str, tuple]] = []
             missing_metadata_msg: str | None = None
 
             async with self._state_lock:
-                self._check_availability()
+                try:
+                    self._check_availability()
+                except PoolCircuitOpenError as exc:
+                    circuit_exc = exc
                 self._append_circuit_hooks(deferred)
-                proxy = self._select(options)
-                if proxy is not None:
-                    self._mark_acquired(proxy, options.session_key)
-                    deferred.append(("on_proxy_acquired", (proxy,)))
-                    if options.session_key:
-                        old = self._pending_session_rebind.pop(options.session_key, None)
-                        if (
-                            old is not None
-                            and old.url != proxy.url
-                            and self._config.hooks.on_session_rebind
-                        ):
-                            deferred.append(
-                                ("on_session_rebind", (options.session_key, old, proxy))
-                            )
-                    break
+
+                if circuit_exc is None:
+                    proxy = self._select(options)
+                    if proxy is not None:
+                        self._mark_acquired(proxy, options.session_key)
+                        deferred.append(("on_proxy_acquired", (proxy,)))
+                        if options.session_key:
+                            old = self._pending_session_rebind.pop(options.session_key, None)
+                            if (
+                                old is not None
+                                and old.url != proxy.url
+                                and self._config.hooks.on_session_rebind
+                            ):
+                                deferred.append(
+                                    ("on_session_rebind", (options.session_key, old, proxy))
+                                )
+                        break
 
                 if timeout < 0:
                     await self._wait_for_availability(None)
@@ -365,17 +632,26 @@ class AsyncProxyPool:
                         await self._wait_for_availability(remaining)
                         continue
 
-                missing_metadata_msg = self._missing_metadata_message(options)
-                if missing_metadata_msg is None:
-                    should_refresh = True
-                    if self._config.hooks.on_exhausted:
-                        exhausted_hooks.append(("on_exhausted", ()))
+                if circuit_exc is not None:
+                    circuit_open = True
+                else:
+                    missing_metadata_msg = self._missing_metadata_message(options)
+                    if missing_metadata_msg is None and not did_on_demand_refresh:
+                        should_refresh = True
+                        if self._config.hooks.on_exhausted:
+                            exhausted_hooks.append(("on_exhausted", ()))
+
+            if circuit_open:
+                await run_deferred(deferred, self._config.hooks)
+                assert circuit_exc is not None
+                raise circuit_exc
 
             if missing_metadata_msg is not None:
                 raise MissingProxyMetadata(missing_metadata_msg)
 
             if should_refresh:
                 refreshed = await self._attempt_on_demand_refresh(options)
+                did_on_demand_refresh = True
                 if refreshed:
                     continue
 
@@ -395,25 +671,57 @@ class AsyncProxyPool:
         return proxy
 
     async def release(self, proxy: Proxy) -> None:
+        """Return a proxy to the pool after a successful use.
+
+        Releases the lease, clears any in-flight HALF_OPEN probe marker,
+        and fires ``on_proxy_released`` when configured. Do not call both
+        :meth:`release` and :meth:`mark_failed` for the same acquisition.
+
+        Args:
+            proxy (Proxy): Proxy previously returned by :meth:`acquire`.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         async with self._state_lock:
             self._return_lease(proxy, count_release_stat=True)
-            if self._half_open_probe_epoch is not None:
+            if self._half_open_probe_proxy is proxy:
                 self._half_open_probe_epoch = None
+                self._half_open_probe_url = None
+                self._half_open_probe_proxy = None
         if self._config.hooks.on_proxy_released:
             await run_deferred([("on_proxy_released", (proxy,))], self._config.hooks)
 
     async def mark_failed(self, proxy: Proxy, exc: type | None = None) -> None:
-        """Report that *proxy* failed (client‑side).
+        """Report that ``proxy`` failed for the current acquisition.
 
-        Also returns the acquire lease (same as :meth:`release`). Do not call both
-        ``mark_failed`` and ``release`` for the same acquisition.
+        Updates failure counts, scoring EMA, cooldown timers, and the
+        circuit breaker. Also returns the acquire lease (do not call both
+        :meth:`mark_failed` and :meth:`release` for the same acquisition).
+        Optionally rotates the proxy when ``rotate_on_failure`` is set.
+
+        Args:
+            proxy (Proxy): Proxy that failed.
+            exc (type | None): Exception class that caused the failure;
+                used for per-type cooldown penalties.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
         """
         deferred: list[tuple[str, tuple]] = []
         rotate = False
-        probe_epoch = self._half_open_probe_epoch
         async with self._state_lock:
+            probe_epoch = self._half_open_probe_epoch
             self._return_lease(proxy, count_release_stat=False)
             self._half_open_probe_epoch = None
+            self._half_open_probe_url = None
+            self._half_open_probe_proxy = None
             self._statistics.failed += 1
             self._emit_stat_metric("pool.failed", float(self._statistics.failed))
             self._consecutive_failures[proxy.url] = self._consecutive_failures.get(proxy.url, 0) + 1
@@ -440,10 +748,30 @@ class AsyncProxyPool:
         await run_deferred(deferred, self._config.hooks)
 
     async def mark_success(self, proxy: Proxy, latency: float | None = None) -> None:
-        """Report that *proxy* succeeded (used for scoring and cooldown removal)."""
+        """Report that ``proxy`` succeeded for the current acquisition.
+
+        Clears any consecutive-failure count, updates scoring EMAs with the
+        observed latency, removes pending cooldown, feeds the circuit
+        breaker, and releases the acquire lease. Do not call both
+        :meth:`mark_success` and :meth:`release` for the same acquisition.
+
+        Args:
+            proxy (Proxy): Proxy that succeeded.
+            latency (float | None): Observed request latency in seconds.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         deferred: list[tuple[str, tuple]] = []
-        probe_epoch = self._half_open_probe_epoch
         async with self._state_lock:
+            probe_epoch = self._half_open_probe_epoch
+            self._return_lease(proxy, count_release_stat=False)
+            self._half_open_probe_epoch = None
+            self._half_open_probe_url = None
+            self._half_open_probe_proxy = None
             self._consecutive_failures.pop(proxy.url, None)
             state = self._scores.get(proxy.url)
             if state is None and self._config.scoring:
@@ -464,16 +792,49 @@ class AsyncProxyPool:
         await run_deferred(deferred, self._config.hooks)
 
     async def _unchecked_proxies(self) -> list[Proxy]:
-        """Return proxies not yet marked working (warmup helper)."""
+        """Return proxies that have not been verified as working yet.
+
+        Helper used by warmup to find candidates worth probing.
+
+        Returns:
+            list[Proxy]: Snapshot of proxies whose ``is_working`` is falsey.
+
+        Version:
+            Added in 4.0.0.
+        """
         async with self._state_lock:
             return [p for p in self._proxies if not p.is_working]
 
-    async def _record_health_check_result(self, proxy: Proxy, result: CheckResult) -> None:
-        """Apply a health-check outcome under the pool lock (warmup helper)."""
+    async def _record_health_check_result(self, proxy: Proxy, result: CheckResult) -> bool:
+        """Apply a health-check outcome to the pool under the state lock.
+
+        Args:
+            proxy (Proxy): The proxy that was checked.
+            result (CheckResult): Outcome of the health check.
+
+        Returns:
+            bool: ``True`` when the result was applied to a proxy still in the pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         async with self._state_lock:
-            self._apply_check_result(proxy, result, [])
+            return self._apply_check_result(proxy, result, [])
 
     def _check_availability(self) -> None:
+        """Raise if the pool is unavailable for new acquisitions.
+
+        Returns:
+            None
+
+        Raises:
+            PoolClosedError: When the pool has already been closed.
+            PoolDrainingError: When the pool is shutting down.
+            PoolCircuitOpenError: When the circuit breaker is shedding load.
+
+        Version:
+            Added in 4.0.0.
+        """
         if self._closed:
             raise PoolClosedError("Pool is closed")
         if self._draining.is_set():
@@ -488,24 +849,73 @@ class AsyncProxyPool:
             raise PoolCircuitOpenError("Circuit breaker open")
 
     def _select(self, options: AcquireOptions) -> Proxy | None:
+        """Apply the active strategy to choose a proxy from eligible candidates.
+
+        Args:
+            options (AcquireOptions): Acquire-time filters.
+
+        Returns:
+            Proxy | None: Selected proxy, or ``None`` when no candidate is
+            eligible.
+
+        Version:
+            Added in 4.0.0.
+        """
         eligible = self._get_eligible(options)
         if not eligible:
             return None
-        return self._strategy.select(eligible, self._scores, self._strategy_state)
+        return self._strategy.select(eligible, self._scores, self._proxies)
 
     @staticmethod
     def _anonymity_rank(label: str | None) -> int:
+        """Return the numeric ranking for an anonymity label.
+
+        Args:
+            label (str | None): Anonymity label (case-insensitive) or ``None``.
+
+        Returns:
+            int: Ranking from :data:`ANONYMITY_RANKS`; ``0`` for unknown or
+            missing labels.
+
+        Version:
+            Added in 4.0.0.
+        """
         if not label:
             return 0
         return ANONYMITY_RANKS.get(label.lower(), 0)
 
     def _metadata_value_missing(self, proxy: Proxy, attr: str) -> bool:
+        """Decide whether a proxy's metadata attribute counts as missing.
+
+        Args:
+            proxy (Proxy): Proxy to inspect.
+            attr (str): Metadata attribute name (``country``, ``anonymity``,
+                ``tags``, ...).
+
+        Returns:
+            bool: ``True`` if the attribute is unset (``None`` or empty).
+
+        Version:
+            Added in 4.0.0.
+        """
         value = getattr(proxy, attr, None)
         if attr == "tags":
             return not value
         return value in (None, "")
 
     def _active_metadata_filters(self, options: AcquireOptions) -> list[tuple[str, Any]]:
+        """Collect active metadata filters from ``options``.
+
+        Args:
+            options (AcquireOptions): Acquire-time filters.
+
+        Returns:
+            list[tuple[str, Any]]: ``(attr_name, filter_value)`` pairs that
+            should be enforced for this acquisition.
+
+        Version:
+            Added in 4.0.0.
+        """
         filters: list[tuple[str, Any]] = []
         if options.country:
             filters.append(("country", options.country))
@@ -518,6 +928,21 @@ class AsyncProxyPool:
     def _proxy_matches_metadata_filter(
         self, proxy: Proxy, attr: str, filter_val: Any, *, ignore_missing: bool
     ) -> bool:
+        """Check whether ``proxy`` satisfies one metadata filter.
+
+        Args:
+            proxy (Proxy): Proxy being inspected.
+            attr (str): Metadata attribute name.
+            filter_val (Any): Required value (or minimum/intersection).
+            ignore_missing (bool): When ``True``, missing metadata is
+                treated as a pass instead of a fail.
+
+        Returns:
+            bool: ``True`` if the proxy matches.
+
+        Version:
+            Added in 4.0.0.
+        """
         if attr == "country":
             if self._metadata_value_missing(proxy, "country"):
                 return ignore_missing
@@ -533,6 +958,20 @@ class AsyncProxyPool:
         return False
 
     def _missing_metadata_message(self, options: AcquireOptions) -> str | None:
+        """Build a :exc:`MissingProxyMetadata` message if required metadata is absent.
+
+        Args:
+            options (AcquireOptions): Acquire-time filters.
+
+        Returns:
+            str | None: A human-readable error message when
+            ``filter_missing_metadata=RAISE`` is active and at least one
+            filter has no matching proxy because of missing metadata.
+            ``None`` otherwise.
+
+        Version:
+            Added in 4.0.0.
+        """
         if self._config.filter_missing_metadata != FilterMissingMetadata.RAISE:
             return None
         for attr, filter_val in self._active_metadata_filters(options):
@@ -549,6 +988,18 @@ class AsyncProxyPool:
         return None
 
     def _classify_acquire_failure(self, options: AcquireOptions):
+        """Pick the most accurate exception to raise from a failed acquire.
+
+        Args:
+            options (AcquireOptions): The acquire-time filters in effect.
+
+        Returns:
+            Exception: One of :exc:`PoolExhausted`, :exc:`PoolSaturated`,
+            or :exc:`NoMatchingProxy`.
+
+        Version:
+            Added in 4.0.0.
+        """
         if not self._proxies:
             return PoolExhausted("No proxies available")
 
@@ -571,13 +1022,48 @@ class AsyncProxyPool:
         return PoolExhausted("No proxies available")
 
     def _any_filter_match(self, options: AcquireOptions) -> bool:
+        """Return ``True`` when at least one proxy passes all filters.
+
+        Args:
+            options (AcquireOptions): Acquire-time filters.
+
+        Returns:
+            bool: ``True`` if any proxy in the pool satisfies the filters.
+
+        Version:
+            Added in 4.0.0.
+        """
         return any(self._sticky_filters_ok(p, options) for p in self._proxies)
 
     def _at_connection_cap(self, proxy: Proxy) -> bool:
+        """Return ``True`` if ``proxy`` has reached its connection limit.
+
+        Args:
+            proxy (Proxy): Proxy to test.
+
+        Returns:
+            bool: ``True`` when ``max_connections_per_proxy`` is set and the
+            current connection count equals or exceeds it.
+
+        Version:
+            Added in 4.0.0.
+        """
         lim = self._config.limits.max_connections_per_proxy
         return bool(lim is not None and self._connections.get(proxy.url, 0) >= lim)
 
     def _sticky_filters_ok(self, proxy: Proxy, options: AcquireOptions) -> bool:
+        """Run every acquire-time filter against ``proxy``.
+
+        Args:
+            proxy (Proxy): Proxy to evaluate.
+            options (AcquireOptions): Acquire-time filters.
+
+        Returns:
+            bool: ``True`` if every active filter passes.
+
+        Version:
+            Added in 4.0.0.
+        """
         ignore_missing = (
             self._config.filter_missing_metadata == FilterMissingMetadata.IGNORE
         )
@@ -591,6 +1077,24 @@ class AsyncProxyPool:
         return True
 
     def _get_eligible(self, options: AcquireOptions) -> list[Proxy]:
+        """Return the list of proxies eligible for selection right now.
+
+        Handles sticky-session resolution, cooldown timers, per-proxy
+        connection limits, and metadata filters.
+
+        Args:
+            options (AcquireOptions): Acquire-time filters.
+
+        Returns:
+            list[Proxy]: Candidate proxies in pool order.
+
+        Raises:
+            SessionBrokenError: When a sticky session is invalid and the
+                policy is :attr:`SessionCooldownPolicy.RAISE`.
+
+        Version:
+            Added in 4.0.0.
+        """
         now = time.monotonic()
 
         if options.session_key:
@@ -600,6 +1104,7 @@ class AsyncProxyPool:
                 list(self._proxies),
                 self._config.session,
                 now,
+                pending_rebind=self._pending_session_rebind,
             )
             if bound is not None:
                 if is_in_cooldown(bound.url, self._cooldown_until, now):
@@ -631,6 +1136,18 @@ class AsyncProxyPool:
         return result
 
     def _mark_acquired(self, proxy: Proxy, session_key: str | None = None) -> None:
+        """Record an acquired lease and maybe bind a sticky session.
+
+        Args:
+            proxy (Proxy): Proxy being handed out.
+            session_key (str | None): Sticky session identifier to bind.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self._connections[proxy.url] = self._connections.get(proxy.url, 0) + 1
         self._statistics.served += 1
         self._emit_stat_metric("pool.served", float(self._statistics.served))
@@ -639,8 +1156,12 @@ class AsyncProxyPool:
             and self._circuit_breaker.state == CircuitBreakerState.HALF_OPEN
         ):
             self._half_open_probe_epoch = self._circuit_breaker.active_probe_epoch
+            self._half_open_probe_url = proxy.url
+            self._half_open_probe_proxy = proxy
         else:
             self._half_open_probe_epoch = None
+            self._half_open_probe_url = None
+            self._half_open_probe_proxy = None
         if session_key:
             self._session_registry[session_key] = SessionEntry(
                 proxy_id=proxy.url,
@@ -653,6 +1174,27 @@ class AsyncProxyPool:
         exc: type | None = None,
         deferred: list[tuple[str, tuple]] | None = None,
     ) -> None:
+        """Apply a cooldown timer to ``proxy`` after a failure.
+
+        No-op when the consecutive failure count is below the configured
+        ``failure_threshold``. Uses a user-supplied
+        ``cooldown.strategy`` callable when provided, otherwise
+        :func:`compute_cooldown`.
+
+        Args:
+            proxy (Proxy): Proxy to cool down.
+            exc (type | None): Exception class that caused the failure
+                (looked up in cooldown penalties).
+            deferred (list[tuple[str, tuple]] | None): Optional hook
+                buffer; receives an ``on_proxy_cooled_down`` entry when the
+                hook is configured.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         cfg = self._config.cooldown
         failures = self._consecutive_failures.get(proxy.url, 0)
         if failures < cfg.failure_threshold:
@@ -675,7 +1217,27 @@ class AsyncProxyPool:
         if deferred is not None and self._config.hooks.on_proxy_cooled_down:
             deferred.append(("on_proxy_cooled_down", (proxy,)))
 
-    def _apply_check_result(self, proxy: Proxy, result: CheckResult, deferred: list) -> None:
+    def _apply_check_result(self, proxy: Proxy, result: CheckResult, deferred: list) -> bool:
+        """Integrate a health-check outcome into pool accounting.
+
+        Updates failure counts, scoring EMA, and cooldown timers. Does not
+        feed the pool-wide circuit breaker (only client-reported outcomes
+        via :meth:`mark_success` / :meth:`mark_failed` do). Queues lifecycle
+        hooks for later execution via :func:`run_deferred`.
+
+        Args:
+            proxy (Proxy): Checked proxy.
+            result (CheckResult): Health-check outcome.
+            deferred (list): Hook-invocation buffer.
+
+        Returns:
+            bool: ``True`` when the result was applied to a proxy still in the pool.
+
+        Version:
+            Added in 4.0.0.
+        """
+        if proxy.url not in {p.url for p in self._proxies}:
+            return False
         if result.success:
             self._consecutive_failures.pop(proxy.url, None)
             if self._config.scoring:
@@ -689,9 +1251,6 @@ class AsyncProxyPool:
                     latency=result.latency,
                     decay=self._config.scoring.decay_factor,
                 )
-            if self._circuit_breaker:
-                self._circuit_breaker.record_success()
-                self._append_circuit_hooks(deferred)
             self._cooldown_until.pop(proxy.url, None)
             if self._config.hooks.on_check_complete:
                 deferred.append(("on_check_complete", (proxy, result)))
@@ -711,17 +1270,42 @@ class AsyncProxyPool:
                     decay=self._config.scoring.decay_factor,
                 )
             self._apply_cooldown(proxy, result.exc_type, deferred)
-            if self._circuit_breaker:
-                self._circuit_breaker.record_failure()
-                self._append_circuit_hooks(deferred)
             if self._config.hooks.on_check_complete:
                 deferred.append(("on_check_complete", (proxy, result)))
             deferred.append(("on_proxy_failed", (proxy, result.exc_type)))
+        return True
 
     def _count_consecutive_failures(self, proxy: Proxy) -> int:
+        """Return the consecutive failure count, never less than ``1``.
+
+        Args:
+            proxy (Proxy): Proxy to inspect.
+
+        Returns:
+            int: At least ``1`` so callers can use it as a multiplier.
+
+        Version:
+            Added in 4.0.0.
+        """
         return max(1, self._consecutive_failures.get(proxy.url, 0))
 
     def _evict_proxy(self, url: str, deferred: list[tuple[str, tuple]] | None = None) -> None:
+        """Remove all bookkeeping for a proxy from the pool.
+
+        Cleans up scoring, cooldown, connection counts, token buckets, and
+        sticky-session entries pointing at the proxy.
+
+        Args:
+            url (str): Canonical URL of the proxy to evict.
+            deferred (list[tuple[str, tuple]] | None): Optional hook buffer
+                that gets an ``on_auto_evicted`` entry when the hook is set.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         evicted_proxy = next((p for p in self._proxies if p.url == url), None)
         self._scores.pop(url, None)
         self._cooldown_until.pop(url, None)
@@ -731,6 +1315,9 @@ class AsyncProxyPool:
         stale = [k for k, entry in self._session_registry.items() if entry.proxy_id == url]
         for key in stale:
             self._session_registry.pop(key, None)
+        stale_rebind = [k for k, bound in self._pending_session_rebind.items() if bound.url == url]
+        for key in stale_rebind:
+            self._pending_session_rebind.pop(key, None)
         if (
             deferred is not None
             and evicted_proxy is not None
@@ -739,11 +1326,37 @@ class AsyncProxyPool:
             deferred.append(("on_auto_evicted", (evicted_proxy, "max_size")))
 
     async def _attempt_on_demand_refresh(self, options: AcquireOptions) -> bool:
+        """Run a single refresh cycle under the refresh lock.
+
+        Args:
+            options (AcquireOptions): Acquire-time filters (currently unused
+                but kept for forward compatibility).
+
+        Returns:
+            bool: ``True`` if at least one new proxy was added.
+
+        Version:
+            Added in 4.0.0.
+        """
+        gen = self._refresh_generation
         async with self._refresh_lock:
+            if self._refresh_generation != gen:
+                return True
             added = await self._refresh_and_merge()
             return added > 0
 
     async def _fetch_new_proxies(self) -> list[Proxy]:
+        """Fetch a fresh proxy list from callbacks or fetchers.
+
+        Refresh callbacks take precedence over fetchers; when neither is
+        configured, an empty list is returned.
+
+        Returns:
+            list[Proxy]: Newly fetched (but not yet merged) proxies.
+
+        Version:
+            Added in 4.0.0.
+        """
         from .refresh import fetch_from_fetchers, fetch_from_refresh_config
 
         refresh = self._config.refresh
@@ -759,7 +1372,17 @@ class AsyncProxyPool:
         return []
 
     async def _refresh_and_merge(self) -> int:
-        """Fetch proxies and merge; return count of newly added URLs."""
+        """Fetch and merge new proxies, firing refresh hooks around the cycle.
+
+        Failures during fetch are logged but never re-raised; the function
+        treats them as "no proxies returned".
+
+        Returns:
+            int: Number of new proxies actually added to the pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         refresh_hooks: list[tuple[str, tuple]] = []
         if self._config.hooks.on_refresh_started:
             refresh_hooks.append(("on_refresh_started", ()))
@@ -787,9 +1410,24 @@ class AsyncProxyPool:
                 [("on_refresh_completed", (added,))],
                 self._config.hooks,
             )
+        self._refresh_generation += 1
         return added
 
     def _merge_new_proxies(self, proxies: list[Proxy]) -> tuple[int, list[tuple[str, tuple]]]:
+        """Append unseen proxies and evict from the front when ``max_size`` is exceeded.
+
+        Args:
+            proxies (list[Proxy]): Freshly fetched proxies.
+
+        Returns:
+            tuple[int, list[tuple[str, tuple]]]: ``(added_count, eviction_hooks)``;
+            ``added_count`` is the number of brand-new URLs and
+            ``eviction_hooks`` is a hook-invocation buffer for any proxies
+            that were evicted to honour ``max_size``.
+
+        Version:
+            Added in 4.0.0.
+        """
         existing_urls = {p.url for p in self._proxies}
         added = 0
         evict_deferred: list[tuple[str, tuple]] = []
@@ -802,9 +1440,64 @@ class AsyncProxyPool:
             while len(self._proxies) > self._config.max_size:
                 evicted = self._proxies.popleft()
                 self._evict_proxy(evicted.url, evict_deferred)
+        self._check_min_size()
         return added, evict_deferred
 
+    def _has_refresh_source(self) -> bool:
+        """Return ``True`` when fetchers or refresh callbacks can refill the pool.
+
+        Returns:
+            bool: Whether an on-demand or periodic refresh can fetch proxies.
+
+        Version:
+            Added in 4.0.0.
+        """
+        refresh = self._config.refresh
+        if (
+            refresh.async_callback
+            or refresh.sync_callback
+            or refresh.fallback_async_callbacks
+            or refresh.fallback_sync_callbacks
+        ):
+            return True
+        return bool(self._fetchers)
+
+    def _check_min_size(self) -> None:
+        """Log and flag refresh when the pool drops below ``min_size``.
+
+        Must be called under ``_state_lock``.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        min_size = self._config.min_size
+        if min_size is None or len(self._proxies) >= min_size:
+            return
+        logger.warning(
+            "Pool size %d below min_size %d",
+            len(self._proxies),
+            min_size,
+        )
+        if self._has_refresh_source():
+            self._refresh_needed = True
+
     async def _health_check_loop(self) -> None:
+        """Background coroutine that periodically health-checks live proxies.
+
+        Sleeps for ``health_check.check_interval`` (default 60s) between
+        cycles. Each cycle gathers the in-flight proxies, runs them through
+        the configured health check bounded by ``self._health_sem``, and
+        applies results under the state lock.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         from .extended_proxy import arun_health_check
 
         hc = self._config.health_check
@@ -841,6 +1534,14 @@ class AsyncProxyPool:
             await run_deferred(deferred, self._config.hooks)
 
     async def _dead_letter_retrier(self) -> None:
+        """Background coroutine: periodically retry dead-letter entries.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         from .dead_letter import retry_cycle
         from .extended_proxy import arun_health_check
 
@@ -853,12 +1554,49 @@ class AsyncProxyPool:
         )
 
     async def _refresh_loop(self) -> None:
+        """Background coroutine: refresh the pool on a fixed interval.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         interval = self._config.refresh.interval_seconds
         while not self._closed:
-            await asyncio.sleep(interval)
-            await self._refresh_and_merge()
+            async with self._state_lock:
+                urgent = self._refresh_needed
+                if urgent:
+                    self._refresh_needed = False
+            if not urgent:
+                await asyncio.sleep(interval)
+            async with self._state_lock:
+                pool_size = len(self._proxies)
+                below_min = (
+                    self._config.min_size is not None
+                    and pool_size < self._config.min_size
+                )
+            if below_min and not self._has_refresh_source():
+                logger.warning(
+                    "Pool size %d below min_size %d but no refresh source configured",
+                    pool_size,
+                    self._config.min_size,
+                )
+            async with self._refresh_lock:
+                await self._refresh_and_merge()
 
     async def _metrics_worker(self) -> None:
+        """Background coroutine: drain queued metrics into the exporter.
+
+        Exceptions raised by the exporter are logged and swallowed so a
+        misbehaving exporter cannot affect the rest of the pool.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         while not self._closed:
             name, value, tags = await self._metrics_queue.get()
             try:
@@ -872,10 +1610,38 @@ class AsyncProxyPool:
         value: float,
         tags: dict[str, str] | None = None,
     ) -> None:
+        """Push a stat metric to the queue when an exporter is configured.
+
+        Args:
+            name (str): Metric name.
+            value (float): Sample value.
+            tags (dict[str, str] | None): Optional label mapping.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if self._config.metrics_exporter:
             self._enqueue_metric(name, value, tags)
 
     def _enqueue_metric(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
+        """Non-blocking enqueue helper for the metrics worker.
+
+        Drops the sample when the queue is full (logged at DEBUG).
+
+        Args:
+            name (str): Metric name.
+            value (float): Sample value.
+            tags (dict[str, str] | None): Optional label mapping.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         try:
             self._metrics_queue.put_nowait((name, value, tags))
         except asyncio.QueueFull:
@@ -883,16 +1649,30 @@ class AsyncProxyPool:
 
     @property
     def statistics(self) -> PoolStatistics:
+        """Read-only access to the live :class:`PoolStatistics` instance.
+
+        Returns:
+            PoolStatistics: Counters maintained by the pool.
+
+        Version:
+            Added in 4.0.0.
+        """
         return self._statistics
 
 
 class SyncProxyPool:
     """Blocking wrapper around :class:`AsyncProxyPool`.
 
-    Usage::
+    Runs an internal event loop on a daemon thread so synchronous code can
+    interact with the async pool using the same API surface. Created
+    instances must be used as a context manager (or closed explicitly with
+    :meth:`close`) so the loop thread is shut down cleanly::
 
         with SyncProxyPool(config, fetchers=[...]) as pool:
             proxy = pool.acquire()
+
+    Version:
+        Added in 4.0.0.
     """
 
     def __init__(
@@ -901,6 +1681,20 @@ class SyncProxyPool:
         initial_proxies: list[Proxy] = (),
         fetchers: list[ProxyFetcher] | None = None,
     ) -> None:
+        """Construct the underlying async pool and spin up the loop thread.
+
+        Args:
+            config (PoolConfig): Pool configuration.
+            initial_proxies (list[Proxy]): Seed proxies.
+            fetchers (list[ProxyFetcher] | None): Optional fetchers.
+
+        Raises:
+            Exception: Any exception raised while entering the async pool
+                is propagated after tearing down the loop thread.
+
+        Version:
+            Added in 4.0.0.
+        """
         self._async_pool = AsyncProxyPool(config, initial_proxies, fetchers)
         self._loop = asyncio.new_event_loop()
         self._shutdown = False
@@ -919,6 +1713,14 @@ class SyncProxyPool:
             raise
 
     def _daemon_loop_runner(self) -> None:
+        """Run the dedicated asyncio loop until ``loop.stop`` is requested.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         asyncio.set_event_loop(self._loop)
         try:
             self._loop.run_forever()
@@ -927,12 +1729,51 @@ class SyncProxyPool:
                 self._loop.close()
 
     def __enter__(self) -> SyncProxyPool:
+        """Enter the context manager.
+
+        Returns:
+            SyncProxyPool: ``self``; the underlying async pool is already
+            started by :meth:`__init__`.
+
+        Version:
+            Added in 4.0.0.
+        """
         return self
 
     def __exit__(self, *args: Any) -> None:
+        """Tear down the underlying loop thread.
+
+        Args:
+            *args (Any): Exception triple from the ``with`` block (unused).
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self.close()
 
+    def __del__(self) -> None:
+        """Best-effort cleanup when the pool is garbage-collected without closing."""
+        try:
+            if not getattr(self, "_shutdown", True):
+                self.close()
+        except Exception:
+            pass
+
     def close(self) -> None:
+        """Drain the async pool and stop the loop thread.
+
+        Idempotent. The loop thread is given five seconds to terminate;
+        failure to do so emits a WARNING log.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if self._shutdown:
             return
         self._shutdown = True
@@ -948,18 +1789,79 @@ class SyncProxyPool:
                 logger.warning("SyncProxyPool loop thread did not stop within 5s")
 
     def _run_on_loop(self, coro):
+        """Schedule ``coro`` on the daemon loop and block for the result.
+
+        Args:
+            coro: Awaitable to run on the loop thread.
+
+        Returns:
+            Any: Whatever ``coro`` resolves to.
+
+        Version:
+            Added in 4.0.0.
+        """
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
     def acquire(self, **filters: Any) -> Proxy:
+        """Synchronous wrapper for :meth:`AsyncProxyPool.acquire`.
+
+        Args:
+            **filters (Any): Acquire-time filters; same semantics as the
+                async variant.
+
+        Returns:
+            Proxy: Acquired proxy.
+
+        Raises:
+            Same exceptions as :meth:`AsyncProxyPool.acquire`.
+
+        Version:
+            Added in 4.0.0.
+        """
         return self._run_on_loop(self._async_pool.acquire(**filters))
 
     def release(self, proxy: Proxy) -> None:
+        """Synchronous wrapper for :meth:`AsyncProxyPool.release`.
+
+        Args:
+            proxy (Proxy): Proxy returned by :meth:`acquire`.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self._run_on_loop(self._async_pool.release(proxy))
 
     def mark_failed(self, proxy: Proxy, exc: type | None = None) -> None:
+        """Synchronous wrapper for :meth:`AsyncProxyPool.mark_failed`.
+
+        Args:
+            proxy (Proxy): Proxy that failed.
+            exc (type | None): Optional exception class.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self._run_on_loop(self._async_pool.mark_failed(proxy, exc))
 
     def mark_success(self, proxy: Proxy, latency: float | None = None) -> None:
+        """Synchronous wrapper for :meth:`AsyncProxyPool.mark_success`.
+
+        Args:
+            proxy (Proxy): Proxy that succeeded.
+            latency (float | None): Observed latency in seconds.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self._run_on_loop(self._async_pool.mark_success(proxy, latency))
 
 

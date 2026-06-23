@@ -118,6 +118,7 @@ class TestCircuitBreaker:
     def test_opens_and_half_open(self, s0, s1, default_pool_config):
         cfg = default_pool_config.model_copy(
             update={
+                "acquire_timeout": 0.0,
                 "circuit_breaker": CircuitBreakerConfig(
                     failure_ratio=0.5,
                     half_open_timeout=0.5,

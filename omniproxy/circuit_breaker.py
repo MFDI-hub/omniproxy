@@ -12,10 +12,27 @@ from .enum import CircuitBreakerState
 
 @dataclass
 class CircuitBreaker:
-    """Drives the pool‑wide OPEN / CLOSED / HALF_OPEN transitions.
+    """Pool-wide circuit breaker state machine.
 
-    All public methods are synchronous and meant to be called under the pool's
-    ``_state_lock``.
+    Drives the CLOSED / OPEN / HALF_OPEN transitions used by the proxy pools to
+    short-circuit acquisitions when the underlying pool is unhealthy. The
+    breaker observes a sliding window of success/failure events; once the
+    failure ratio over ``min_throughput`` samples crosses
+    ``CircuitBreakerConfig.failure_ratio`` it trips to OPEN, blocks new
+    requests until ``half_open_timeout`` elapses, then allows a single probe to
+    decide whether to close again.
+
+    All public methods are synchronous and intentionally cheap; callers (the
+    pools) invoke them under their own ``_state_lock``.
+
+    Attributes:
+        config (CircuitBreakerConfig): Tuning knobs for the breaker.
+        state (CircuitBreakerState): Current breaker state.
+        event_window (deque[tuple[float, bool]]): Sliding window of
+            ``(monotonic_timestamp, success)`` tuples used in CLOSED state.
+
+    Version:
+        Added in 4.0.0.
     """
 
     config: CircuitBreakerConfig
@@ -30,16 +47,50 @@ class CircuitBreaker:
 
     @property
     def active_probe_epoch(self) -> int | None:
-        """Epoch of the in-flight HALF_OPEN probe, if any."""
+        """Epoch of the in-flight HALF_OPEN probe.
+
+        Returns:
+            int | None: Monotonic epoch identifying the currently in-flight
+            probe, or ``None`` when no probe is active. Used by callers to tag
+            their outcome so late completions for stale probes are ignored.
+
+        Version:
+            Added in 4.0.0.
+        """
         return self._active_probe_epoch if self._probe_in_flight else None
 
     def drain_pending_transitions(self) -> list[str]:
-        """Return and clear pending state transition labels (``open`` / ``close``)."""
+        """Pop and return queued transition labels.
+
+        Returns:
+            list[str]: An ordered list containing ``"open"`` and/or ``"close"``
+            entries representing transitions that occurred since the last
+            drain. The internal buffer is cleared.
+
+        Version:
+            Added in 4.0.0.
+        """
         out = list(self._pending_transitions)
         self._pending_transitions.clear()
         return out
 
     def record_failure(self, now: float | None = None, *, probe_epoch: int | None = None) -> None:
+        """Record a failed proxy request against the breaker.
+
+        Args:
+            now (float | None): Monotonic timestamp of the failure. Defaults
+                to ``time.monotonic()``.
+            probe_epoch (int | None): Epoch returned from
+                :pyattr:`active_probe_epoch` when the call was issued. Only
+                meaningful while the breaker is HALF_OPEN; stale epochs are
+                ignored.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if now is None:
             now = time.monotonic()
         if self.state == CircuitBreakerState.HALF_OPEN:
@@ -52,6 +103,22 @@ class CircuitBreaker:
         self._maybe_open(now)
 
     def record_success(self, now: float | None = None, *, probe_epoch: int | None = None) -> None:
+        """Record a successful proxy request against the breaker.
+
+        Args:
+            now (float | None): Monotonic timestamp of the success. Defaults
+                to ``time.monotonic()``.
+            probe_epoch (int | None): Epoch returned from
+                :pyattr:`active_probe_epoch` when the call was issued. Only
+                meaningful while the breaker is HALF_OPEN; stale epochs are
+                ignored.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if now is None:
             now = time.monotonic()
         if self.state == CircuitBreakerState.HALF_OPEN:
@@ -63,9 +130,23 @@ class CircuitBreaker:
         self._trim_window(now)
 
     def allow_request(self, now: float | None = None) -> bool:
-        """Return False if the breaker disallows a new acquisition.
+        """Decide whether a new proxy acquisition is allowed.
 
-        In HALF_OPEN, the first allowed call atomically claims the probe slot.
+        In CLOSED state, this both prunes the event window and re-evaluates
+        the trip condition. In OPEN, it transitions to HALF_OPEN once the
+        cooldown has elapsed and claims the probe slot atomically. In
+        HALF_OPEN, only the first caller that finds the slot free is allowed.
+
+        Args:
+            now (float | None): Monotonic timestamp to evaluate against.
+                Defaults to ``time.monotonic()``.
+
+        Returns:
+            bool: ``True`` if the caller may proceed to acquire a proxy,
+            ``False`` if the breaker is shedding load.
+
+        Version:
+            Added in 4.0.0.
         """
         if now is None:
             now = time.monotonic()
@@ -90,7 +171,20 @@ class CircuitBreaker:
         return True
 
     def probe_completed(self, success: bool, now: float | None = None) -> None:
-        """Call with the probe outcome (HALF_OPEN only)."""
+        """Resolve the in-flight HALF_OPEN probe.
+
+        Args:
+            success (bool): ``True`` to transition back to CLOSED, ``False``
+                to re-open the breaker.
+            now (float | None): Monotonic timestamp of completion. Defaults
+                to ``time.monotonic()``.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if now is None:
             now = time.monotonic()
         if not self._probe_in_flight:
@@ -104,19 +198,51 @@ class CircuitBreaker:
             self._to_open(now)
 
     def _probe_completion_valid(self, probe_epoch: int | None) -> bool:
+        """Return ``True`` if ``probe_epoch`` belongs to the in-flight probe.
+
+        Args:
+            probe_epoch (int | None): Epoch returned from
+                :pyattr:`active_probe_epoch` when the call was issued.
+
+        Returns:
+            bool: ``True`` when the breaker should consume this outcome.
+
+        Version:
+            Added in 4.0.0.
+        """
         if not self._probe_in_flight:
             return False
-        if probe_epoch is None:
-            return True
-        return probe_epoch == self._active_probe_epoch
+        return probe_epoch is not None and probe_epoch == self._active_probe_epoch
 
     def _begin_probe(self, now: float) -> None:
+        """Allocate a fresh probe slot at ``now``.
+
+        Args:
+            now (float): Monotonic timestamp of probe start.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self._probe_epoch += 1
         self._active_probe_epoch = self._probe_epoch
         self._probe_in_flight = True
         self._probe_started_at = now
 
     def _expire_stale_probe(self, now: float) -> None:
+        """Release the probe slot if it has exceeded ``half_open_timeout``.
+
+        Args:
+            now (float): Monotonic timestamp used to compute the age.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if not self._probe_in_flight or self._probe_started_at is None:
             return
         if now - self._probe_started_at >= self.config.half_open_timeout:
@@ -126,11 +252,34 @@ class CircuitBreaker:
             self._probe_epoch += 1
 
     def _trim_window(self, now: float) -> None:
+        """Drop events older than ``config.window_seconds`` from the window.
+
+        Args:
+            now (float): Monotonic timestamp considered "now".
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         horizon = now - self.config.window_seconds
         while self.event_window and self.event_window[0][0] < horizon:
             self.event_window.popleft()
 
     def _maybe_open(self, now: float) -> None:
+        """Trip to OPEN if the windowed failure ratio is high enough.
+
+        Args:
+            now (float): Monotonic timestamp recorded as the open time when
+                the breaker trips.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if self.state != CircuitBreakerState.CLOSED:
             return
         total = len(self.event_window)
@@ -141,6 +290,17 @@ class CircuitBreaker:
             self._to_open(now)
 
     def _to_open(self, now: float) -> None:
+        """Internal transition to ``OPEN``.
+
+        Args:
+            now (float): Monotonic timestamp stored as ``_opened_at``.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if self.state != CircuitBreakerState.OPEN:
             self._pending_transitions.append("open")
         self.state = CircuitBreakerState.OPEN
@@ -150,12 +310,31 @@ class CircuitBreaker:
         self._active_probe_epoch = None
 
     def _to_half_open(self) -> None:
+        """Internal transition to ``HALF_OPEN``.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         self.state = CircuitBreakerState.HALF_OPEN
         self._probe_in_flight = False
         self._probe_started_at = None
         self._active_probe_epoch = None
 
     def _to_closed(self) -> None:
+        """Internal transition to ``CLOSED``.
+
+        Resets the sliding event window so a freshly closed breaker starts
+        from a clean slate.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
         if self.state != CircuitBreakerState.CLOSED:
             self._pending_transitions.append("close")
         self.state = CircuitBreakerState.CLOSED

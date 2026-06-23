@@ -49,6 +49,9 @@ def read_proxies(
         ...     port = read_proxies(p)[0].port
         >>> port
         8080
+
+    Version:
+        Added in 4.0.0.
     """
     from .extended_proxy import Proxy
 
@@ -97,6 +100,9 @@ def save_proxies(
         ...     save_proxies(out, ["127.0.0.1:1"])
         ...     out.read_text().strip()
         '127.0.0.1:1'
+
+    Version:
+        Added in 4.0.0.
     """
     path = Path(filepath)
     lines = [str(p).strip() for p in proxies if str(p).strip()]
@@ -136,6 +142,9 @@ def iter_proxies_from_file(
         ...     port = next(iter_proxies_from_file(fp)).port
         >>> port
         9
+
+    Version:
+        Added in 4.0.0.
     """
 
     path = Path(filepath)
@@ -173,6 +182,9 @@ def _iter_proxies_from_text_stream(
         ...     )
         ... ).port
         3
+
+    Version:
+        Added in 4.0.0.
     """
     from .extended_proxy import Proxy
 
@@ -215,6 +227,9 @@ def fetch_proxies(
         >>> from omniproxy.io import fetch_proxies
         >>> fetch_proxies.__name__
         'fetch_proxies'
+
+    Version:
+        Added in 4.0.0.
     """
     from .extended_proxy import Proxy
 

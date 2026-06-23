@@ -9,6 +9,25 @@ from ..proxy import Proxy
 
 @runtime_checkable
 class ProxyFetcher(Protocol):
-    """Async source of proxies; may return strings or validated :class:`~omniproxy.proxy.Proxy` objects."""
+    """Pluggable async source of proxies.
 
-    async def fetch(self) -> list[Proxy | str]: ...
+    Concrete implementations live alongside this module
+    (:class:`FileFetcher`, :class:`URLFetcher`, :class:`ScrapeFetcher`).
+    They are consumed by :class:`AsyncProxyPool` via the refresh loop and
+    by :func:`fetch_from_fetchers`.
+
+    Version:
+        Added in 4.0.0.
+    """
+
+    async def fetch(self) -> list[Proxy | str]:
+        """Fetch the current list of proxies from this source.
+
+        Returns:
+            list[Proxy | str]: Either parsed :class:`Proxy` objects or
+            raw strings that downstream code will normalise.
+
+        Version:
+            Added in 4.0.0.
+        """
+        ...

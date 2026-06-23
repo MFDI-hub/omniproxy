@@ -18,6 +18,23 @@ _POLL_INTERVAL = 0.25
 
 
 def _proxy_counts_as_ready(config: WarmupConfig, proxy, result) -> bool:
+    """Decide whether a freshly checked proxy is considered "warm".
+
+    A proxy counts as ready when the health check succeeded and the optional
+    user validator returns ``>= 1.0``. Validator exceptions are logged and
+    treated as a failure.
+
+    Args:
+        config (WarmupConfig): Warmup configuration providing the validator.
+        proxy: The :class:`Proxy` instance being evaluated.
+        result: ``CheckResult`` from the health check.
+
+    Returns:
+        bool: ``True`` if the proxy is ready, ``False`` otherwise.
+
+    Version:
+        Added in 4.0.0.
+    """
     if not result.success:
         return False
     if config.validator is None:
@@ -34,9 +51,29 @@ async def run_warmup(
     config: WarmupConfig,
     health_check_fn,
 ) -> tuple[bool, int]:
-    """Check proxies until *min_ready* are working or timeout.
+    """Drive the warmup phase until ``min_ready`` proxies are validated or timeout.
 
-    Returns ``(success, ready_count)``.
+    Repeatedly takes unchecked candidates from the pool, runs the supplied
+    ``health_check_fn`` against each (bounded by the pool's health semaphore),
+    and records successes. The loop exits when enough proxies are ready, when
+    the configured timeout elapses, or when there are no candidates left.
+
+    Args:
+        pool (AsyncProxyPool): Async pool being warmed.
+        config (WarmupConfig): Warmup configuration.
+        health_check_fn: Awaitable callable
+            ``(proxy, health_check_config) -> (proxy, CheckResult)``.
+
+    Returns:
+        tuple[bool, int]: ``(success, ready_count)`` where ``success`` is
+        ``True`` only when ``ready_count >= config.min_ready``.
+
+    Raises:
+        WarmupFailedError: When the timeout elapses and
+            ``config.failure_policy`` is :attr:`WarmupFailurePolicy.RAISE`.
+
+    Version:
+        Added in 4.0.0.
     """
     if not config.enabled:
         return True, 0
@@ -77,9 +114,10 @@ async def run_warmup(
             if isinstance(item, BaseException):
                 continue
             proxy, result = item
+            applied = False
             if result.success:
-                await pool._record_health_check_result(proxy, result)
-            if _proxy_counts_as_ready(config, proxy, result):
+                applied = await pool._record_health_check_result(proxy, result)
+            if applied and _proxy_counts_as_ready(config, proxy, result):
                 ready_urls.add(proxy.url)
                 if len(ready_urls) >= config.min_ready:
                     return True, len(ready_urls)

@@ -9,7 +9,19 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class EMAState:
-    """Exponentially weighted moving average for success rate and latency."""
+    """Exponentially weighted moving averages for success rate and latency.
+
+    Attributes:
+        success_ema (float): Exponential moving average of success outcomes
+            in ``[0.0, 1.0]``. Initialised to ``1.0`` (optimistic).
+        latency_ema (float | None): Exponential moving average of request
+            latencies in seconds. ``None`` until the first sample arrives.
+        last_update (float): Monotonic timestamp of the last update.
+
+    Version:
+        Added in 4.0.0.
+    """
+
     success_ema: float = 1.0          # initial assumption of health
     latency_ema: float | None = None
     last_update: float = 0.0          # monotonic timestamp
@@ -22,9 +34,27 @@ def update_ema(
     decay: float,
     now: float | None = None,
 ) -> EMAState:
-    """Update *state* in‑place and return it.
+    """Update an :class:`EMAState` with a fresh observation.
 
-    *decay* is the smoothing factor (e.g. 0.9).  Higher → more weight on history.
+    The state object is mutated in place; the same reference is returned for
+    convenience.
+
+    Args:
+        state (EMAState): State to update.
+        success (bool): Whether the observation was a success.
+        latency (float | None): Latency in seconds. ``None``, ``NaN``, and
+            ``inf`` are ignored for the latency EMA.
+        decay (float): Smoothing factor in ``(0, 1)``. Higher values give
+            more weight to history (e.g. ``0.9`` keeps 90% of the previous
+            average).
+        now (float | None): Monotonic timestamp recorded as
+            ``state.last_update``. Defaults to ``time.monotonic()``.
+
+    Returns:
+        EMAState: The mutated ``state`` object.
+
+    Version:
+        Added in 4.0.0.
     """
     if now is None:
         now: int | float = time.monotonic()
@@ -46,7 +76,23 @@ def compute_score(
     success_weight: float = 0.6,
     latency_weight: float = 0.4,
 ) -> float:
-    """Combine success EMA and latency EMA into a single 0‑1 score."""
+    """Combine the success and latency EMAs into a single ``[0.0, 1.0]`` score.
+
+    The latency contribution is normalised against a 1-second reference; a
+    latency EMA at or above that ceiling contributes ``0`` to the score.
+
+    Args:
+        state (EMAState): EMA state to score.
+        success_weight (float): Weight applied to ``state.success_ema``.
+        latency_weight (float): Weight applied to the normalised latency
+            score. ``success_weight + latency_weight`` should equal ``1.0``.
+
+    Returns:
+        float: Combined score in ``[0.0, 1.0]``.
+
+    Version:
+        Added in 4.0.0.
+    """
     if state.latency_ema is None or state.latency_ema <= 0:
         latency_score = 0.0
     else:

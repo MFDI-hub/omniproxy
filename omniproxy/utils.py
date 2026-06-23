@@ -1,3 +1,15 @@
+"""Low-level proxy parsing, validation, and string-rendering helpers.
+
+This module powers :class:`omniproxy.proxy.Proxy` and
+:class:`omniproxy.proxy.ProxyPattern`: it defines the :class:`OmniproxyParser`
+msgspec struct used to validate parsed components, a collection of
+pre-compiled regexes for normalising proxy patterns, and
+:func:`get_formatted_proxy_string` for rendering a proxy through a pattern.
+
+Version:
+    4.0.0
+"""
+
 from __future__ import annotations
 
 import ipaddress
@@ -46,7 +58,25 @@ TOKENS_RE = re.compile(_STRUCTURAL_FIELDS_PATTERN)
 
 
 def _validate_ip_or_normalize_host(v_stripped: str) -> str:
-    """Validate and normalise hostname / IP via C-backed :mod:`ipaddress`."""
+    """Validate ``v_stripped`` and normalise it into a URL-safe representation.
+
+    For IPv4/IPv6 inputs the value is parsed via :mod:`ipaddress`; IPv6
+    addresses are bracketed when needed for URL safety. For hostnames the
+    value must match :data:`~omniproxy.constants.HOSTNAME_RE`.
+
+    Args:
+        v_stripped (str): Already stripped IP literal or hostname.
+
+    Returns:
+        str: Normalised host string suitable for embedding in a URL.
+
+    Raises:
+        ValueError: If ``v_stripped`` looks like a dotted numeric string
+            that is not a valid IP, or matches neither IP nor hostname rules.
+
+    Version:
+        Added in 4.0.0.
+    """
     ip_to_test = v_stripped.strip("[]")
 
     try:
@@ -286,6 +316,24 @@ def _preprocessed_pattern_skeleton(
     has_username: bool,
     has_password: bool,
 ) -> str:
+    """Pre-strip optional segments from a free-form proxy pattern.
+
+    Cached because ``_substitution_kwargs`` and the regex passes are
+    relatively expensive on every render.
+
+    Args:
+        pattern (str): Free-form pattern (not necessarily a :class:`ProxyPattern`).
+        has_rotation_url (bool): Whether the proxy carries a rotation URL.
+        has_username (bool): Whether the proxy has a username.
+        has_password (bool): Whether the proxy has a password.
+
+    Returns:
+        str: Pattern with optional username/password/rotation segments
+        removed and adjacent punctuation collapsed.
+
+    Version:
+        Added in 4.0.0.
+    """
     s = pattern
     if not has_rotation_url:
         s = REMOVE_BRACKETS_RE.sub("", s)
@@ -300,7 +348,18 @@ def _preprocessed_pattern_skeleton(
 
 
 def _substitution_kwargs(dumped: dict[str, Any]) -> dict[str, Any]:
-    """Map ``None`` structural fields to empty strings so :meth:`str.format` does not emit ``'None'``."""
+    """Replace ``None`` structural fields with empty strings for ``str.format``.
+
+    Args:
+        dumped (dict[str, Any]): Mapping of field name to current value.
+
+    Returns:
+        dict[str, Any]: Same keys with ``None`` replaced by ``""`` so
+        :meth:`str.format` does not emit literal ``'None'``.
+
+    Version:
+        Added in 4.0.0.
+    """
     out: dict[str, Any] = {}
     for k, v in dumped.items():
         out[k] = "" if v is None else v

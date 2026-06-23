@@ -20,6 +20,9 @@ def supported_backends() -> tuple[str, ...]:
     Example:
         >>> "httpx" in supported_backends()
         True
+
+    Version:
+        Added in 4.0.0.
     """
     return SUPPORTED_BACKENDS
 
@@ -40,6 +43,9 @@ def get_backend(name: str | None = None) -> BaseBackend:
     Example:
         >>> get_backend.__name__
         'get_backend'
+
+    Version:
+        Added in 4.0.0.
     """
     from ..config import settings
 

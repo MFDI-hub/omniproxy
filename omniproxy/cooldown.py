@@ -18,22 +18,32 @@ def compute_cooldown(
     _min: float = 30.0,
     _max: float = 600.0,
 ) -> float:
-    """Return the number of seconds a proxy should stay in cooldown.
+    """Compute how long a proxy should stay in cooldown.
 
-    Parameters
-    ----------
-    base: float
-        Base cooldown seconds.
-    adaptive: bool
-        If True, cooldown grows exponentially with failure_count.
-    failure_count: int
-        Number of consecutive failures.
-    penalties: dict
-        Additional seconds added per exception type.
-    exception_type: type | None
-        Exception type that caused the failure (used to look up penalty).
-    _min, _max: float
-        Clamp values.
+    Combines a base duration, optional exponential growth based on the
+    consecutive failure count, and an additive per-exception-type penalty
+    before clamping into ``[_min, _max]``.
+
+    Args:
+        base (float): Base cooldown duration in seconds.
+        adaptive (bool): If ``True``, the duration grows as
+            ``base * 2 ** (failure_count - 1)``.
+        failure_count (int): Number of consecutive failures observed for
+            the proxy (must be ``>= 1``).
+        penalties (dict[type[BaseException], float]): Mapping of exception
+            type to extra seconds added when ``exception_type`` matches.
+            The first matching key in iteration order wins.
+        exception_type (type[BaseException] | None): Exception class that
+            caused the failure. Used as the key in ``penalties``.
+        _min (float): Lower clamp; defaults to ``30.0``.
+        _max (float): Upper clamp; defaults to ``600.0``.
+
+    Returns:
+        float: Cooldown duration in seconds, guaranteed to be in
+        ``[_min, _max]``.
+
+    Version:
+        Added in 4.0.0.
     """
     if adaptive:
         duration: float | int = base * (2 ** (failure_count - 1))
@@ -50,7 +60,25 @@ def compute_cooldown(
 
 
 def is_in_cooldown(proxy_id: str, cooldown_until: dict[str, float], now: float | None = None) -> bool:
-    """Check whether *proxy_id* is still cooling down."""
+    """Check whether ``proxy_id`` is still cooling down.
+
+    The mapping ``cooldown_until`` is mutated as a side effect: expired
+    entries are removed before the function returns.
+
+    Args:
+        proxy_id (str): Proxy identifier.
+        cooldown_until (dict[str, float]): Mutable mapping of proxy id to
+            the monotonic timestamp at which cooldown ends.
+        now (float | None): Monotonic timestamp considered "now". Defaults
+            to ``time.monotonic()``.
+
+    Returns:
+        bool: ``True`` if the proxy is still cooling down, ``False`` if
+        it has cooled off or was never registered.
+
+    Version:
+        Added in 4.0.0.
+    """
     if now is None:
         now: int | float = time.monotonic()
     until: int | float | None = cooldown_until.get(proxy_id)

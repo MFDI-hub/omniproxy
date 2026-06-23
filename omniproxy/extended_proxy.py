@@ -1,3 +1,19 @@
+"""Extended :class:`Proxy` plus single- and bulk-proxy check helpers.
+
+Builds on :mod:`omniproxy.proxy` by adding:
+
+* :class:`Proxy` - the public subclass used everywhere in the package.
+* :class:`CheckResult` - structured outcome returned by checks.
+* :func:`check_proxy` / :func:`acheck_proxy` - single-proxy HTTP checks
+  with retry, anonymity detection, and metadata writeback.
+* :func:`check_proxies` / :func:`acheck_proxies` - bulk variants.
+* :func:`run_health_check` / :func:`arun_health_check` - the
+  :class:`HealthCheckConfig`-driven probes used by the pool.
+
+Version:
+    4.0.0
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -847,8 +863,26 @@ def run_health_check(
     *,
     backend: str | None = None,
 ) -> tuple[Proxy, CheckResult]:
-    """
-    Run a full health check against *proxy* using *hc* config.
+    """Run a full synchronous health check against ``proxy`` using ``hc``.
+
+    Resolves the target URL (per-config or the global default), forwards
+    expected status / JSON field expectations, and returns a structured
+    :class:`CheckResult`. When ``hc.custom_check`` is set, the HTTP probe is
+    skipped and the user-supplied callable decides the outcome.
+
+    Args:
+        proxy (Proxy | str): Proxy under test (strings are coerced to
+            :class:`Proxy`).
+        hc (HealthCheckConfig): Health-check specification.
+        backend (str | None): Backend override; defaults to settings.
+
+    Returns:
+        tuple[Proxy, CheckResult]: ``(proxy, result)`` pair, where ``proxy``
+        is the (possibly newly created) :class:`Proxy` and ``result``
+        captures the outcome.
+
+    Version:
+        Added in 4.0.0.
     """
     if hc.custom_check is not None:
         if not isinstance(proxy, Proxy):
@@ -919,7 +953,19 @@ async def arun_health_check(
 
 
 def _rebuild_models_with_forward_proxy_refs() -> None:
-    """Resolve ``Proxy`` inside Pydantic callables (:class:`~omniproxy.config.LimitsConfig`, etc.)."""
+    """Rebuild config models so they see the concrete :class:`Proxy` type.
+
+    Several config models hold callable fields that reference ``"Proxy"`` as
+    a forward string. After the extended :class:`Proxy` subclass is created
+    we call this function to re-bind those forward references; otherwise
+    pydantic emits "model has unresolved annotations" warnings at first use.
+
+    Returns:
+        None
+
+    Version:
+        Added in 4.0.0.
+    """
     from .config import (
         HealthCheckConfig,
         LifecycleHooks,

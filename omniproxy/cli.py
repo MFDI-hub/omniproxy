@@ -9,18 +9,33 @@ from .backends.factory import supported_backends
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint for ``check`` and ``scrape`` subcommands.
+    """CLI entrypoint for the ``check`` and ``scrape`` subcommands.
+
+    Parses ``argv`` and dispatches to one of:
+
+    * ``check`` - load proxies from a file, validate them with the configured
+      backend, and optionally write the working ones to disk.
+    * ``scrape`` - download a URL and extract proxy-like strings from its
+      body, optionally saving them to disk.
 
     Args:
-        argv (list[str] | None): Arguments (excluding program name); ``None`` uses ``sys.argv``.
+        argv (list[str] | None): Arguments excluding the program name. When
+            ``None``, ``sys.argv[1:]`` is used.
 
     Returns:
-        int: Process exit code (``0`` on success).
+        int: Process exit code. ``0`` on success.
+
+    Raises:
+        RuntimeError: If argparse fails to route to a subcommand (should be
+            unreachable in normal use).
 
     Example:
         >>> from omniproxy.cli import main
         >>> isinstance(main.__doc__, str)
         True
+
+    Version:
+        Added in 4.0.0.
     """
     backend_help = " | ".join(supported_backends())
     parser = argparse.ArgumentParser(prog="omniproxy", description="Proxy string utilities")

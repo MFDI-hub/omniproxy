@@ -18,6 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_proxies(items: list) -> list[Proxy]:
+    """Normalize a heterogenous list into validated :class:`Proxy` objects.
+
+    Strings are parsed via :meth:`Proxy.validate`; existing :class:`Proxy`
+    instances are kept as-is. Anything that fails validation or that is not
+    a :class:`Proxy` is silently dropped.
+
+    Args:
+        items (list): Items returned by a refresh callback or fetcher.
+
+    Returns:
+        list[Proxy]: Validated proxies preserving the original order.
+
+    Version:
+        Added in 4.0.0.
+    """
     proxies: list[Proxy] = []
     for item in items:
         try:
@@ -31,7 +46,23 @@ def _normalize_proxies(items: list) -> list[Proxy]:
 
 
 async def _run_callback(config: RefreshConfig) -> list[Proxy]:
-    """Try primary then fallback callbacks with timeout."""
+    """Run the configured refresh callbacks until one produces proxies.
+
+    Tries the primary async callback, the primary sync callback, then the
+    fallback async and sync callbacks (in that order). Each invocation is
+    bounded by ``config.timeout``. Failures are logged and the next
+    callback is attempted.
+
+    Args:
+        config (RefreshConfig): Refresh configuration with callbacks and timeout.
+
+    Returns:
+        list[Proxy]: The first non-empty validated proxy list, or ``[]`` if
+        all callbacks failed.
+
+    Version:
+        Added in 4.0.0.
+    """
     callbacks: list = []
     if config.async_callback:
         callbacks.append(("async", config.async_callback))
@@ -62,12 +93,36 @@ async def _run_callback(config: RefreshConfig) -> list[Proxy]:
 
 
 async def fetch_from_refresh_config(config: RefreshConfig) -> list[Proxy]:
-    """Execute configured callbacks, trying async first then fallbacks."""
+    """Public wrapper for executing a :class:`RefreshConfig`.
+
+    Args:
+        config (RefreshConfig): Refresh configuration.
+
+    Returns:
+        list[Proxy]: Validated proxies from the first successful callback,
+        or an empty list when every callback failed.
+
+    Version:
+        Added in 4.0.0.
+    """
     return await _run_callback(config)
 
 
 async def fetch_from_fetchers(fetchers: list[ProxyFetcher]) -> list[Proxy]:
-    """Iterate over fetcher objects, deduplicating results."""
+    """Aggregate proxies from a list of fetchers with deduplication.
+
+    Each fetcher is awaited in order. Items that cannot be parsed are
+    dropped; the remainder are deduplicated by canonical proxy URL.
+
+    Args:
+        fetchers (list[ProxyFetcher]): Ordered list of fetchers to query.
+
+    Returns:
+        list[Proxy]: Unique validated proxies in first-seen order.
+
+    Version:
+        Added in 4.0.0.
+    """
     seen: set[str] = set()
     collected: list[Proxy] = []
     for fetcher in fetchers:

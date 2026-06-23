@@ -1,3 +1,16 @@
+"""Immutable :class:`Proxy` string subclass and its :class:`ProxyPattern` template.
+
+This module defines the lightweight base ``Proxy`` that powers the rest of
+omniproxy: a :class:`str` subclass whose value is the canonical URL, with
+parsed structural fields (protocol, ip, port, credentials, rotation URL)
+and metadata slots (latency, anonymity, last check info, geo). The
+``ProxyPattern`` helper validates and pre-compiles user-facing templates
+used to render proxies.
+
+Version:
+    4.0.0
+"""
+
 from __future__ import annotations
 
 import ipaddress
@@ -428,10 +441,18 @@ class Proxy(str):
         return self.latency is not None and self.latency > 0
 
     def _ordering_key(self) -> tuple[float, float, str]:
-        """Stable sort key: lower latency first, then fresher ``last_checked``, then :attr:`url`.
+        """Compute the stable sort key used by ``<`` / ``>`` / :func:`sorted`.
 
-        Missing latency sorts after any measured value. Missing ``last_checked`` sorts after
-        entries with the same latency that have a timestamp (newer timestamps win ties).
+        The tuple is ordered so lower latency wins first, ties are broken by
+        more recent ``last_checked``, and remaining ties by canonical URL.
+        Missing latency sorts after any measured value; missing
+        ``last_checked`` sorts after entries with a timestamp.
+
+        Returns:
+            tuple[float, float, str]: ``(latency, -last_checked, url)`` key.
+
+        Version:
+            Added in 4.0.0.
         """
         lat = self.latency
         lat_key = float("inf") if lat is None else float(lat)
@@ -691,33 +712,69 @@ class Proxy(str):
         return NotImplemented
 
     def __le__(self, other: object) -> bool:
-        if not isinstance(other, Proxy):
-            return NotImplemented
-        return self._ordering_key() <= other._ordering_key()
-
-    def __ge__(self, other: object) -> bool:
-        if not isinstance(other, Proxy):
-            return NotImplemented
-        return self._ordering_key() >= other._ordering_key()
-
-    def __lt__(self, other: object) -> bool:
-        """Compare for ``sorted()`` / ``<``: lower latency first, then newer ``last_checked``.
+        """``<=`` comparison using :meth:`_ordering_key`.
 
         Args:
             other (object): Another :class:`Proxy` or subclass.
 
         Returns:
-            bool: Ordering per :meth:`_ordering_key`.
+            bool: ``True`` when this proxy's ordering key is ``<=`` ``other``'s;
+            ``NotImplemented`` for unsupported types.
 
-        Raises:
-            TypeError: Implicitly if *other* is not a :class:`Proxy`; returns ``NotImplemented``.
+        Version:
+            Added in 4.0.0.
+        """
+        if not isinstance(other, Proxy):
+            return NotImplemented
+        return self._ordering_key() <= other._ordering_key()
+
+    def __ge__(self, other: object) -> bool:
+        """``>=`` comparison using :meth:`_ordering_key`.
+
+        Args:
+            other (object): Another :class:`Proxy` or subclass.
+
+        Returns:
+            bool: ``True`` when this proxy's ordering key is ``>=`` ``other``'s;
+            ``NotImplemented`` for unsupported types.
+
+        Version:
+            Added in 4.0.0.
+        """
+        if not isinstance(other, Proxy):
+            return NotImplemented
+        return self._ordering_key() >= other._ordering_key()
+
+    def __lt__(self, other: object) -> bool:
+        """``<`` comparison used by :func:`sorted` and ``min`` / ``max``.
+
+        Args:
+            other (object): Another :class:`Proxy` or subclass.
+
+        Returns:
+            bool: Ordering per :meth:`_ordering_key`; ``NotImplemented`` for
+            unsupported types.
+
+        Version:
+            Added in 4.0.0.
         """
         if not isinstance(other, Proxy):
             return NotImplemented
         return self._ordering_key() < other._ordering_key()
 
     def __gt__(self, other: object) -> bool:
-        """Inverse of :meth:`__lt__` for ``>`` comparisons."""
+        """``>`` comparison; the inverse of :meth:`__lt__`.
+
+        Args:
+            other (object): Another :class:`Proxy` or subclass.
+
+        Returns:
+            bool: ``True`` when this proxy's ordering key is greater than
+            ``other``'s; ``NotImplemented`` for unsupported types.
+
+        Version:
+            Added in 4.0.0.
+        """
         if not isinstance(other, Proxy):
             return NotImplemented
         return self._ordering_key() > other._ordering_key()
@@ -783,22 +840,66 @@ class Proxy(str):
             object.__setattr__(self, key, value)
 
     def __getstate__(self) -> dict[str, Any]:
+        """Return picklable metadata state.
+
+        Returns:
+            dict[str, Any]: Mapping of every metadata attribute name to its
+            current value. Used by ``copy.copy`` / ``pickle``.
+
+        Version:
+            Added in 4.0.0.
+        """
         return {k: getattr(self, k) for k in self._metadata_attributes}
 
     def __bool__(self) -> bool:
+        """Boolean test alias for :attr:`is_working`.
+
+        Returns:
+            bool: ``True`` when the proxy is considered working.
+
+        Version:
+            Added in 4.0.0.
+        """
         return self.is_working
 
     def _copy_with_same_state(self) -> Self:
-        """New instance with the same canonical URL and metadata snapshot (for copy protocols)."""
+        """Build a clone preserving canonical URL and full metadata snapshot.
+
+        Returns:
+            Self: New instance with the same structural fields and a copy
+            of all metadata attributes.
+
+        Version:
+            Added in 4.0.0.
+        """
         clone = self.__class__(str(self))
         for k in self._metadata_attributes:
             object.__setattr__(clone, k, getattr(self, k))
         return cast(Self, clone)
 
     def __copy__(self) -> Self:
+        """``copy.copy`` hook returning a fresh clone with the same state.
+
+        Returns:
+            Self: Independent clone.
+
+        Version:
+            Added in 4.0.0.
+        """
         return self._copy_with_same_state()
 
     def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        """``copy.deepcopy`` hook with cycle detection via ``memo``.
+
+        Args:
+            memo (dict[int, Any]): Standard ``deepcopy`` memo dict.
+
+        Returns:
+            Self: Independent clone, cached in ``memo``.
+
+        Version:
+            Added in 4.0.0.
+        """
         i = id(self)
         if i in memo:
             return memo[i]
