@@ -10,25 +10,27 @@
       
       
       
+        <link rel="canonical" href="https://mfdi.github.io/omniproxy/adr/0011-thread-safety-concurrency-guarantees/">
+      
       
       
       
         
       
       
-      <link rel="icon" href="/omniproxy/assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>omniproxy</title>
+        <title>0011 thread safety concurrency guarantees - omniproxy</title>
       
     
     
-      <link rel="stylesheet" href="/omniproxy/assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="/omniproxy/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="/omniproxy/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/omniproxy/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -73,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#context" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -83,7 +90,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/omniproxy/." title="omniproxy" class="md-header__button md-logo" aria-label="omniproxy" data-md-component="logo">
+    <a href="../.." title="omniproxy" class="md-header__button md-logo" aria-label="omniproxy" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -103,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              0011 thread safety concurrency guarantees
             
           </span>
         </div>
@@ -226,7 +233,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/omniproxy/index.md" class="md-tabs__link">
+      <a href="../../index.md" class="md-tabs__link">
         
   
   
@@ -247,7 +254,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/omniproxy/adr/" class="md-tabs__link">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -269,7 +276,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/omniproxy/reference/overview.md" class="md-tabs__link">
+        <a href="../../reference/overview.md" class="md-tabs__link">
           
   
   
@@ -289,7 +296,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/omniproxy/cli.md" class="md-tabs__link">
+      <a href="../../cli.md" class="md-tabs__link">
         
   
   
@@ -308,7 +315,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/omniproxy/api.md" class="md-tabs__link">
+      <a href="../../api.md" class="md-tabs__link">
         
   
   
@@ -343,7 +350,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/omniproxy/." title="omniproxy" class="md-nav__button md-logo" aria-label="omniproxy" data-md-component="logo">
+    <a href="../.." title="omniproxy" class="md-nav__button md-logo" aria-label="omniproxy" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -373,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/index.md" class="md-nav__link">
+      <a href="../../index.md" class="md-nav__link">
         
   
   
@@ -447,7 +454,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="/omniproxy/adr/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -491,7 +498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0001-library-scope-not-proxy-server/" class="md-nav__link">
+      <a href="../0001-library-scope-not-proxy-server/" class="md-nav__link">
         
   
   
@@ -519,7 +526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0002-proxy-as-str-subclass/" class="md-nav__link">
+      <a href="../0002-proxy-as-str-subclass/" class="md-nav__link">
         
   
   
@@ -547,7 +554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0003-pluggable-http-backends/" class="md-nav__link">
+      <a href="../0003-pluggable-http-backends/" class="md-nav__link">
         
   
   
@@ -575,7 +582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0004-async-first-pool-sync-bridge/" class="md-nav__link">
+      <a href="../0004-async-first-pool-sync-bridge/" class="md-nav__link">
         
   
   
@@ -603,7 +610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0005-explicit-lease-lifecycle/" class="md-nav__link">
+      <a href="../0005-explicit-lease-lifecycle/" class="md-nav__link">
         
   
   
@@ -631,7 +638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0006-frozen-pydantic-config-presets/" class="md-nav__link">
+      <a href="../0006-frozen-pydantic-config-presets/" class="md-nav__link">
         
   
   
@@ -659,7 +666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0007-circuit-breaker-client-outcomes-only/" class="md-nav__link">
+      <a href="../0007-circuit-breaker-client-outcomes-only/" class="md-nav__link">
         
   
   
@@ -687,7 +694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0008-selection-strategies-and-ema-scoring/" class="md-nav__link">
+      <a href="../0008-selection-strategies-and-ema-scoring/" class="md-nav__link">
         
   
   
@@ -715,7 +722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0009-sticky-sessions-and-rotation-urls/" class="md-nav__link">
+      <a href="../0009-sticky-sessions-and-rotation-urls/" class="md-nav__link">
         
   
   
@@ -743,7 +750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0010-pluggable-fetchers-refresh-dead-letter/" class="md-nav__link">
+      <a href="../0010-pluggable-fetchers-refresh-dead-letter/" class="md-nav__link">
         
   
   
@@ -859,7 +866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/README.md" class="md-nav__link">
+      <a href="../../pool-flows/README.md" class="md-nav__link">
         
   
   
@@ -887,7 +894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/01-async-pool-start.md" class="md-nav__link">
+      <a href="../../pool-flows/01-async-pool-start.md" class="md-nav__link">
         
   
   
@@ -915,7 +922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/02-sync-pool-start.md" class="md-nav__link">
+      <a href="../../pool-flows/02-sync-pool-start.md" class="md-nav__link">
         
   
   
@@ -943,7 +950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/03-acquire.md" class="md-nav__link">
+      <a href="../../pool-flows/03-acquire.md" class="md-nav__link">
         
   
   
@@ -971,7 +978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/04-release.md" class="md-nav__link">
+      <a href="../../pool-flows/04-release.md" class="md-nav__link">
         
   
   
@@ -999,7 +1006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/05-mark-success.md" class="md-nav__link">
+      <a href="../../pool-flows/05-mark-success.md" class="md-nav__link">
         
   
   
@@ -1027,7 +1034,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/06-mark-failed.md" class="md-nav__link">
+      <a href="../../pool-flows/06-mark-failed.md" class="md-nav__link">
         
   
   
@@ -1055,7 +1062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/07-close-drain.md" class="md-nav__link">
+      <a href="../../pool-flows/07-close-drain.md" class="md-nav__link">
         
   
   
@@ -1083,7 +1090,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/08-refresh-merge.md" class="md-nav__link">
+      <a href="../../pool-flows/08-refresh-merge.md" class="md-nav__link">
         
   
   
@@ -1111,7 +1118,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/09-sticky-sessions.md" class="md-nav__link">
+      <a href="../../pool-flows/09-sticky-sessions.md" class="md-nav__link">
         
   
   
@@ -1139,7 +1146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/10-circuit-breaker.md" class="md-nav__link">
+      <a href="../../pool-flows/10-circuit-breaker.md" class="md-nav__link">
         
   
   
@@ -1167,7 +1174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/11-health-check-loop.md" class="md-nav__link">
+      <a href="../../pool-flows/11-health-check-loop.md" class="md-nav__link">
         
   
   
@@ -1195,7 +1202,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/12-warmup.md" class="md-nav__link">
+      <a href="../../pool-flows/12-warmup.md" class="md-nav__link">
         
   
   
@@ -1223,7 +1230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/13-config-presets.md" class="md-nav__link">
+      <a href="../../pool-flows/13-config-presets.md" class="md-nav__link">
         
   
   
@@ -1251,7 +1258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/14-statistics-metrics.md" class="md-nav__link">
+      <a href="../../pool-flows/14-statistics-metrics.md" class="md-nav__link">
         
   
   
@@ -1279,7 +1286,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/15-dead-letter.md" class="md-nav__link">
+      <a href="../../pool-flows/15-dead-letter.md" class="md-nav__link">
         
   
   
@@ -1396,7 +1403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/overview.md" class="md-nav__link">
+      <a href="../../reference/overview.md" class="md-nav__link">
         
   
   
@@ -1424,7 +1431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/proxy.md" class="md-nav__link">
+      <a href="../../reference/proxy.md" class="md-nav__link">
         
   
   
@@ -1452,7 +1459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/parser.md" class="md-nav__link">
+      <a href="../../reference/parser.md" class="md-nav__link">
         
   
   
@@ -1480,7 +1487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/backends.md" class="md-nav__link">
+      <a href="../../reference/backends.md" class="md-nav__link">
         
   
   
@@ -1508,7 +1515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/checking.md" class="md-nav__link">
+      <a href="../../reference/checking.md" class="md-nav__link">
         
   
   
@@ -1536,7 +1543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/io.md" class="md-nav__link">
+      <a href="../../reference/io.md" class="md-nav__link">
         
   
   
@@ -1564,7 +1571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/pools.md" class="md-nav__link">
+      <a href="../../reference/pools.md" class="md-nav__link">
         
   
   
@@ -1592,7 +1599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/configuration.md" class="md-nav__link">
+      <a href="../../reference/configuration.md" class="md-nav__link">
         
   
   
@@ -1620,7 +1627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/exports.md" class="md-nav__link">
+      <a href="../../reference/exports.md" class="md-nav__link">
         
   
   
@@ -1655,7 +1662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/cli.md" class="md-nav__link">
+      <a href="../../cli.md" class="md-nav__link">
         
   
   
@@ -1682,7 +1689,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/api.md" class="md-nav__link">
+      <a href="../../api.md" class="md-nav__link">
         
   
   
@@ -1720,6 +1727,69 @@
   
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1731,8 +1801,90 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+  <h1>0011 thread safety concurrency guarantees</h1>
+
+<div class="language-text highlight"><pre><span></span><code># ADR-0011: Thread‑safety and concurrency guarantees
+</code></pre></div>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-07-16</li>
+<li><strong>Tags:</strong> concurrency, pool, api-contract</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p><code>AsyncProxyPool</code> manages mutable state (leases, scoring, cooldowns, session registry) and runs background coroutines. <code>SyncProxyPool</code> wraps this async engine inside a daemon thread holding a private event loop. Users inevitably share pool instances across threads, <code>concurrent.futures</code> executors, or async tasks. Without an explicit contract they will make unsafe assumptions (fork‑safety, mixing sync and async calls on the same pool, calling <code>acquire</code> from two threads simultaneously).</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong><code>AsyncProxyPool</code></strong> is safe for concurrent use from <strong>multiple asyncio tasks executing in the same event loop</strong>. Internal mutations are protected by <code>asyncio.Lock</code> where needed. It is <strong>not</strong> designed for direct use from multiple event loops or threads without an external synchronisation wrapper.</p>
+</li>
+<li>
+<p><strong><code>SyncProxyPool</code></strong> provides a <strong>thread‑safe</strong> façade: every public method dispatches to the private loop through a <code>threading.Lock</code>. This means multiple threads may call <code>acquire</code> / <code>release</code> / <code>mark_success</code> / <code>mark_failed</code> concurrently.</p>
+</li>
+<li>
+<p><strong>Not fork‑safe</strong>: neither pool survives <code>os.fork()</code>. The daemon thread and event loop are not recreated after fork; users must instantiate fresh pools in child processes.</p>
+</li>
+<li>
+<p><strong>Not re‑entrant into async code</strong>: do not call <code>SyncProxyPool</code> methods from within a coroutine running in the same event loop as the private one (it would deadlock). Users mixing styles should keep the async pool as the single source and use <code>asyncio.to_thread</code> if needed.</p>
+</li>
+<li>
+<p>User‑supplied hooks (e.g. <code>on_acquire</code>, <code>on_release</code>, fetcher callbacks) execute inside the pool’s event loop. Callers must ensure they are safe in that context.</p>
+</li>
+</ol>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong> Clear safety boundaries; thread‑safe sync API lets scripts and threading‑based apps share a pool; async users get efficient native orchestration.</li>
+<li><strong>Negative:</strong> Sync overhead (lock + cross‑thread call) under heavy contention; fork‑safety limitation must be prominently documented.</li>
+<li><strong>Neutral:</strong> The internal lock and loop ownership may be revisited if a future version adds a <code>ProcessPool</code> variant.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No thread‑safety guarantees (caller must lock)</td>
+<td>Forces every user to reinvent synchronisation; pool state would be corrupted easily.</td>
+</tr>
+<tr>
+<td>Multiprocessing‑safe pool</td>
+<td>Out of library scope; adds heavy IPC dependencies.</td>
+</tr>
+<tr>
+<td>Allow <code>SyncProxyPool</code> inside async code</td>
+<td>Creates deadlock hazards and violates the single‑loop ownership model.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="evidence">Evidence<a class="headerlink" href="#evidence" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>omniproxy/pool.py</code> (<code>SyncProxyPool</code> lock implementation, daemon thread lifecycle)</li>
+<li><code>omniproxy/pool.py</code> (<code>AsyncProxyPool</code> internal <code>asyncio.Lock</code> for scoring/leasing)</li>
+<li><code>docs/for_mine_and_only_my.md</code> (user guide mentions threading constraints)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1793,10 +1945,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/omniproxy/", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "/omniproxy/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/omniproxy/assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

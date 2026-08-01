@@ -10,25 +10,27 @@
       
       
       
+        <link rel="canonical" href="https://mfdi.github.io/omniproxy/adr/0014-cli-design-integration-principles/">
+      
       
       
       
         
       
       
-      <link rel="icon" href="/omniproxy/assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>omniproxy</title>
+        <title>ADR-0014: CLI design and integration principles - omniproxy</title>
       
     
     
-      <link rel="stylesheet" href="/omniproxy/assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="/omniproxy/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="/omniproxy/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/omniproxy/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -73,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#adr-0014-cli-design-and-integration-principles" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -83,7 +90,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/omniproxy/." title="omniproxy" class="md-header__button md-logo" aria-label="omniproxy" data-md-component="logo">
+    <a href="../.." title="omniproxy" class="md-header__button md-logo" aria-label="omniproxy" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -103,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              ADR-0014: CLI design and integration principles
             
           </span>
         </div>
@@ -226,7 +233,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/omniproxy/index.md" class="md-tabs__link">
+      <a href="../../index.md" class="md-tabs__link">
         
   
   
@@ -247,7 +254,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/omniproxy/adr/" class="md-tabs__link">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -269,7 +276,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/omniproxy/reference/overview.md" class="md-tabs__link">
+        <a href="../../reference/overview.md" class="md-tabs__link">
           
   
   
@@ -289,7 +296,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/omniproxy/cli.md" class="md-tabs__link">
+      <a href="../../cli.md" class="md-tabs__link">
         
   
   
@@ -308,7 +315,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/omniproxy/api.md" class="md-tabs__link">
+      <a href="../../api.md" class="md-tabs__link">
         
   
   
@@ -343,7 +350,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/omniproxy/." title="omniproxy" class="md-nav__button md-logo" aria-label="omniproxy" data-md-component="logo">
+    <a href="../.." title="omniproxy" class="md-nav__button md-logo" aria-label="omniproxy" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -373,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/index.md" class="md-nav__link">
+      <a href="../../index.md" class="md-nav__link">
         
   
   
@@ -447,7 +454,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="/omniproxy/adr/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -491,7 +498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0001-library-scope-not-proxy-server/" class="md-nav__link">
+      <a href="../0001-library-scope-not-proxy-server/" class="md-nav__link">
         
   
   
@@ -519,7 +526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0002-proxy-as-str-subclass/" class="md-nav__link">
+      <a href="../0002-proxy-as-str-subclass/" class="md-nav__link">
         
   
   
@@ -547,7 +554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0003-pluggable-http-backends/" class="md-nav__link">
+      <a href="../0003-pluggable-http-backends/" class="md-nav__link">
         
   
   
@@ -575,7 +582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0004-async-first-pool-sync-bridge/" class="md-nav__link">
+      <a href="../0004-async-first-pool-sync-bridge/" class="md-nav__link">
         
   
   
@@ -603,7 +610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0005-explicit-lease-lifecycle/" class="md-nav__link">
+      <a href="../0005-explicit-lease-lifecycle/" class="md-nav__link">
         
   
   
@@ -631,7 +638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0006-frozen-pydantic-config-presets/" class="md-nav__link">
+      <a href="../0006-frozen-pydantic-config-presets/" class="md-nav__link">
         
   
   
@@ -659,7 +666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0007-circuit-breaker-client-outcomes-only/" class="md-nav__link">
+      <a href="../0007-circuit-breaker-client-outcomes-only/" class="md-nav__link">
         
   
   
@@ -687,7 +694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0008-selection-strategies-and-ema-scoring/" class="md-nav__link">
+      <a href="../0008-selection-strategies-and-ema-scoring/" class="md-nav__link">
         
   
   
@@ -715,7 +722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0009-sticky-sessions-and-rotation-urls/" class="md-nav__link">
+      <a href="../0009-sticky-sessions-and-rotation-urls/" class="md-nav__link">
         
   
   
@@ -743,7 +750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/adr/0010-pluggable-fetchers-refresh-dead-letter/" class="md-nav__link">
+      <a href="../0010-pluggable-fetchers-refresh-dead-letter/" class="md-nav__link">
         
   
   
@@ -859,7 +866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/README.md" class="md-nav__link">
+      <a href="../../pool-flows/README.md" class="md-nav__link">
         
   
   
@@ -887,7 +894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/01-async-pool-start.md" class="md-nav__link">
+      <a href="../../pool-flows/01-async-pool-start.md" class="md-nav__link">
         
   
   
@@ -915,7 +922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/02-sync-pool-start.md" class="md-nav__link">
+      <a href="../../pool-flows/02-sync-pool-start.md" class="md-nav__link">
         
   
   
@@ -943,7 +950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/03-acquire.md" class="md-nav__link">
+      <a href="../../pool-flows/03-acquire.md" class="md-nav__link">
         
   
   
@@ -971,7 +978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/04-release.md" class="md-nav__link">
+      <a href="../../pool-flows/04-release.md" class="md-nav__link">
         
   
   
@@ -999,7 +1006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/05-mark-success.md" class="md-nav__link">
+      <a href="../../pool-flows/05-mark-success.md" class="md-nav__link">
         
   
   
@@ -1027,7 +1034,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/06-mark-failed.md" class="md-nav__link">
+      <a href="../../pool-flows/06-mark-failed.md" class="md-nav__link">
         
   
   
@@ -1055,7 +1062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/07-close-drain.md" class="md-nav__link">
+      <a href="../../pool-flows/07-close-drain.md" class="md-nav__link">
         
   
   
@@ -1083,7 +1090,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/08-refresh-merge.md" class="md-nav__link">
+      <a href="../../pool-flows/08-refresh-merge.md" class="md-nav__link">
         
   
   
@@ -1111,7 +1118,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/09-sticky-sessions.md" class="md-nav__link">
+      <a href="../../pool-flows/09-sticky-sessions.md" class="md-nav__link">
         
   
   
@@ -1139,7 +1146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/10-circuit-breaker.md" class="md-nav__link">
+      <a href="../../pool-flows/10-circuit-breaker.md" class="md-nav__link">
         
   
   
@@ -1167,7 +1174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/11-health-check-loop.md" class="md-nav__link">
+      <a href="../../pool-flows/11-health-check-loop.md" class="md-nav__link">
         
   
   
@@ -1195,7 +1202,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/12-warmup.md" class="md-nav__link">
+      <a href="../../pool-flows/12-warmup.md" class="md-nav__link">
         
   
   
@@ -1223,7 +1230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/13-config-presets.md" class="md-nav__link">
+      <a href="../../pool-flows/13-config-presets.md" class="md-nav__link">
         
   
   
@@ -1251,7 +1258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/14-statistics-metrics.md" class="md-nav__link">
+      <a href="../../pool-flows/14-statistics-metrics.md" class="md-nav__link">
         
   
   
@@ -1279,7 +1286,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/pool-flows/15-dead-letter.md" class="md-nav__link">
+      <a href="../../pool-flows/15-dead-letter.md" class="md-nav__link">
         
   
   
@@ -1396,7 +1403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/overview.md" class="md-nav__link">
+      <a href="../../reference/overview.md" class="md-nav__link">
         
   
   
@@ -1424,7 +1431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/proxy.md" class="md-nav__link">
+      <a href="../../reference/proxy.md" class="md-nav__link">
         
   
   
@@ -1452,7 +1459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/parser.md" class="md-nav__link">
+      <a href="../../reference/parser.md" class="md-nav__link">
         
   
   
@@ -1480,7 +1487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/backends.md" class="md-nav__link">
+      <a href="../../reference/backends.md" class="md-nav__link">
         
   
   
@@ -1508,7 +1515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/checking.md" class="md-nav__link">
+      <a href="../../reference/checking.md" class="md-nav__link">
         
   
   
@@ -1536,7 +1543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/io.md" class="md-nav__link">
+      <a href="../../reference/io.md" class="md-nav__link">
         
   
   
@@ -1564,7 +1571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/pools.md" class="md-nav__link">
+      <a href="../../reference/pools.md" class="md-nav__link">
         
   
   
@@ -1592,7 +1599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/configuration.md" class="md-nav__link">
+      <a href="../../reference/configuration.md" class="md-nav__link">
         
   
   
@@ -1620,7 +1627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/reference/exports.md" class="md-nav__link">
+      <a href="../../reference/exports.md" class="md-nav__link">
         
   
   
@@ -1655,7 +1662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/cli.md" class="md-nav__link">
+      <a href="../../cli.md" class="md-nav__link">
         
   
   
@@ -1682,7 +1689,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/omniproxy/api.md" class="md-nav__link">
+      <a href="../../api.md" class="md-nav__link">
         
   
   
@@ -1719,6 +1726,71 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1731,8 +1803,87 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="adr-0014-cli-design-and-integration-principles">ADR-0014: CLI design and integration principles<a class="headerlink" href="#adr-0014-cli-design-and-integration-principles" title="Permanent link">&para;</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-07-16</li>
+<li><strong>Tags:</strong> cli, architecture</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The library ships a small CLI (<code>omniproxy check</code>, <code>omniproxy scrape</code>) described as “for ops”. As the feature set grows, there is pressure to add more commands (watch, scheduled refresh, metrics export). Without a design principle, business logic could leak into the CLI, or the CLI could introduce server‑like features that violate ADR‑0001.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>The CLI is a thin wrapper</strong>: it parses arguments, instantiates objects using the library’s public API, calls library functions, and formats output. No business logic lives inside <code>cli.py</code> or its supporting modules.</p>
+</li>
+<li>
+<p><strong>Every CLI workflow is a library function first</strong>: e.g. <code>check_proxies</code> and <code>fetch_proxies</code> are callable from Python; the CLI simply provides argument parsing and output formatting on top.</p>
+</li>
+<li>
+<p><strong>Output formats</strong>: the CLI supports plain text (default) and JSON (via a <code>--json</code> flag). Structured output uses <code>orjson</code> (already a hard dependency). No pretty‑printer framework is added; the formatting stays minimal.</p>
+</li>
+<li>
+<p><strong>No <code>omniproxy serve</code></strong>: a long‑running process that accepts inbound traffic or acts as a daemon is explicitly out of scope, reinforcing ADR‑0001.</p>
+</li>
+<li>
+<p><strong>CLI‑only dependencies</strong> (e.g. <code>click</code>, <code>rich</code>) are optional extras that the main library does not import. The CLI may ship as a separate entry point that fails gracefully with an install hint if the extra is missing.</p>
+</li>
+</ol>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong> Library stays free of CLI‑framework dependencies; all workflows are scriptable without the CLI; scope boundary is enforced.</li>
+<li><strong>Negative:</strong> The CLI stays minimal; users who want rich TUI or daemon features must build their own.</li>
+<li><strong>Neutral:</strong> CLI argument names mirror library parameter names closely, serving as informal documentation.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rich, multi‑command CLI with progress bars</td>
+<td>Adds heavy dependencies and encourages business logic in the CLI.</td>
+</tr>
+<tr>
+<td>No CLI at all</td>
+<td>Loses quick operational checks and the scraping helper that many users rely on.</td>
+</tr>
+<tr>
+<td>CLI that duplicates library logic</td>
+<td>Maintenance fork; bugs fixed in one place but not the other.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="evidence">Evidence<a class="headerlink" href="#evidence" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>omniproxy/cli.py</code> (argparse‑based entry points)</li>
+<li><code>omniproxy/io.py</code> (scrape helpers reused by CLI)</li>
+<li><code>pyproject.toml</code> (<code>[project.scripts]</code> and optional‑dependency <code>cli</code>)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1793,10 +1944,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/omniproxy/", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "/omniproxy/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/omniproxy/assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
