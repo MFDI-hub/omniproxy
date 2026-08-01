@@ -469,7 +469,7 @@ class CooldownConfig(BaseModel):
             overrides the default adaptive logic.
         failure_threshold (int): Consecutive failures required before
             cooldown is applied.
-        penalties (dict[type, float]): Multiplier applied to the cooldown
+        penalties (dict[type[BaseException], float]): Extra seconds applied
             for specific exception types.
 
     Version:
@@ -483,7 +483,7 @@ class CooldownConfig(BaseModel):
     max: float = 600.0
     strategy: Callable[[float, int, int], float] | None = None
     failure_threshold: int = 1
-    penalties: dict[type, float] = Field(default_factory=dict)
+    penalties: dict[type[BaseException], float] = Field(default_factory=dict)
 
 class WarmupConfig(BaseModel):
     """Pool warmup behaviour run at start-up.

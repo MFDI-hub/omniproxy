@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .config import SessionConfig
-    from .proxy import Proxy
+    from .extended_proxy import Proxy
 
 @dataclass(slots=True)
 class SessionEntry:

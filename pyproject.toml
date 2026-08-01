@@ -146,6 +146,8 @@ ignore = [
 "tests/*" = ["S101", "ARG", "FBT"]
 "omniproxy/backends/aiohttp_client.py" = ["SIM117"]
 "omniproxy/client.py" = ["F822"]
+# Protocol method signatures must keep parameter names for ty keyword matching.
+"omniproxy/strategies.py" = ["ARG002"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -164,12 +166,13 @@ include = ["omniproxy"]
 
 [tool.ty.analysis]
 allowed-unresolved-imports = [
-    "aiohttp",
-    "aiohttp_socks",
-    "curl_cffi",
-    "tls_client",
-    "python_socks",
-    "requests",
+    "aiohttp.**",
+    "aiohttp_socks.**",
+    "curl_cffi.**",
+    "tls_client.**",
+    "python_socks.**",
+    "requests.**",
+    "prometheus_client.**",
 ]
 
 # =========================

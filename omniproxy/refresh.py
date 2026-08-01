@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
-from .proxy import Proxy
+from .extended_proxy import Proxy
+from .proxy import Proxy as BaseProxy
 
 if TYPE_CHECKING:
     from .config import RefreshConfig
@@ -17,12 +18,34 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _coerce_proxy(item: object) -> Proxy | None:
+    """Coerce a refresh/fetcher item into the public :class:`Proxy` type.
+
+    Args:
+        item (object): Raw callback/fetcher item (string or proxy instance).
+
+    Returns:
+        Proxy | None: Validated public proxy, or ``None`` when coercion fails.
+    """
+    try:
+        if isinstance(item, str):
+            return Proxy.validate(item)
+        if isinstance(item, Proxy):
+            return item
+        if isinstance(item, BaseProxy):
+            return Proxy.validate(str(item))
+    except (ValueError, ValidationError):
+        return None
+    return None
+
+
 def _normalize_proxies(items: list) -> list[Proxy]:
     """Normalize a heterogenous list into validated :class:`Proxy` objects.
 
     Strings are parsed via :meth:`Proxy.validate`; existing :class:`Proxy`
-    instances are kept as-is. Anything that fails validation or that is not
-    a :class:`Proxy` is silently dropped.
+    instances are kept as-is. Base :class:`~omniproxy.proxy.Proxy` instances
+    are re-validated as the public subclass. Anything that fails validation
+    is silently dropped.
 
     Args:
         items (list): Items returned by a refresh callback or fetcher.
@@ -35,13 +58,9 @@ def _normalize_proxies(items: list) -> list[Proxy]:
     """
     proxies: list[Proxy] = []
     for item in items:
-        try:
-            proxy = Proxy.validate(item) if isinstance(item, str) else item
-        except (ValueError, ValidationError):
-            continue
-        if not isinstance(proxy, Proxy):
-            continue
-        proxies.append(proxy)
+        proxy = _coerce_proxy(item)
+        if proxy is not None:
+            proxies.append(proxy)
     return proxies
 
 
@@ -140,11 +159,8 @@ async def fetch_from_fetchers(
             logger.warning("Fetcher %r failed", fetcher, exc_info=True)
             continue
         for item in raw:
-            try:
-                proxy = Proxy.validate(item) if isinstance(item, str) else item
-            except (ValueError, ValidationError):
-                continue
-            if not isinstance(proxy, Proxy):
+            proxy = _coerce_proxy(item)
+            if proxy is None:
                 continue
             if proxy.url not in seen:
                 seen.add(proxy.url)

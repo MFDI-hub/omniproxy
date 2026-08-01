@@ -32,6 +32,7 @@ from .constants import (
     DEFAULT_CHECK_MAX_RETRIES,
     DEFAULT_CHECK_RETRY_BACKOFF,
     DEFAULT_RETRYABLE_HTTP_STATUSES,
+    DEFAULT_TIMEOUT,
     URL_HEADERS_PROBE,
 )
 from .enum import AnonymityLeakHeader, AnonymityTier
@@ -469,7 +470,13 @@ async def acheck_proxy(
         proxy = Proxy(proxy)
 
     backend_impl = get_backend(backend)
-    to = timeout if timeout is not None else settings.default_timeout
+    to: float = (
+        timeout
+        if timeout is not None
+        else settings.default_timeout
+        if settings.default_timeout is not None
+        else DEFAULT_TIMEOUT
+    )
     retry_status = (
         retry_on_status if retry_on_status is not None else DEFAULT_RETRYABLE_HTTP_STATUSES
     )
@@ -655,7 +662,13 @@ def check_proxy(
         proxy = Proxy(proxy)
 
     backend_impl = get_backend(backend)
-    to = timeout if timeout is not None else settings.default_timeout
+    to: float = (
+        timeout
+        if timeout is not None
+        else settings.default_timeout
+        if settings.default_timeout is not None
+        else DEFAULT_TIMEOUT
+    )
     retry_status = (
         retry_on_status if retry_on_status is not None else DEFAULT_RETRYABLE_HTTP_STATUSES
     )

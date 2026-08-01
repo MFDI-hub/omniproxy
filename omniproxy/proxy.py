@@ -25,6 +25,7 @@ from typing_extensions import Self
 from .config import settings
 from .constants import (
     DEFAULT_PROXY_PATTERN_STRING,
+    DEFAULT_TIMEOUT,
     PROXY_METADATA_FIELDS,
     PROXY_PATTERN_ALLOWED_WORDS,
     PROXY_STRUCTURAL_FIELDS,
@@ -589,7 +590,13 @@ class Proxy(str):
         if not self.rotation_url:
             raise ValueError("This proxy has no rotation_url")
         impl = get_backend(backend)
-        to = timeout if timeout is not None else settings.default_timeout
+        to: float = (
+            timeout
+            if timeout is not None
+            else settings.default_timeout
+            if settings.default_timeout is not None
+            else DEFAULT_TIMEOUT
+        )
         verb = method if isinstance(method, HttpVerb) else HttpVerb(method)
         r = impl.request_direct(verb.value, str(self.rotation_url), timeout=to, **kwargs)
         return r.status_code == 200
@@ -625,7 +632,13 @@ class Proxy(str):
         if not self.rotation_url:
             raise ValueError("This proxy has no rotation_url")
         impl = get_backend(backend)
-        to = timeout if timeout is not None else settings.default_timeout
+        to: float = (
+            timeout
+            if timeout is not None
+            else settings.default_timeout
+            if settings.default_timeout is not None
+            else DEFAULT_TIMEOUT
+        )
         verb = method if isinstance(method, HttpVerb) else HttpVerb(method)
         r = await impl.arequest_direct(verb.value, str(self.rotation_url), timeout=to, **kwargs)
         return r.status_code == 200
@@ -647,14 +660,14 @@ class Proxy(str):
         cls.default_pattern = ProxyPattern(pattern)
 
     @classmethod
-    def validate(cls, v: str) -> Proxy:
+    def validate(cls, v: str) -> Self:
         """Parse *v* or raise ``ValueError`` with the original error chained.
 
         Args:
             v (str): Raw proxy string.
 
         Returns:
-            Proxy: Valid instance.
+            Self: Valid instance of the concrete class.
 
         Raises:
             ValueError: If parsing fails.
@@ -875,7 +888,7 @@ class Proxy(str):
         clone = self.__class__(str(self))
         for k in self._metadata_attributes:
             object.__setattr__(clone, k, getattr(self, k))
-        return cast(Self, clone)
+        return clone
 
     def __copy__(self) -> Self:
         """``copy.copy`` hook returning a fresh clone with the same state.

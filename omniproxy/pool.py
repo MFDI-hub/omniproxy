@@ -1776,8 +1776,11 @@ class AsyncProxyPool:
         """
         while not self._closed:
             name, value, tags = await self._metrics_queue.get()
+            exporter = self._config.metrics_exporter
+            if exporter is None:
+                continue
             try:
-                self._config.metrics_exporter.emit_gauge(name, value, tags)
+                exporter.emit_gauge(name, value, tags)
             except Exception:
                 logger.exception("Metrics emission failed")
 
@@ -1858,14 +1861,14 @@ class SyncProxyPool:
     def __init__(
         self,
         config: PoolConfig,
-        initial_proxies: list[Proxy] = (),
+        initial_proxies: list[Proxy] | None = None,
         fetchers: list[ProxyFetcher] | None = None,
     ) -> None:
         """Construct the underlying async pool and spin up the loop thread.
 
         Args:
             config (PoolConfig): Pool configuration.
-            initial_proxies (list[Proxy]): Seed proxies.
+            initial_proxies (list[Proxy] | None): Seed proxies.
             fetchers (list[ProxyFetcher] | None): Optional fetchers.
 
         Raises:
