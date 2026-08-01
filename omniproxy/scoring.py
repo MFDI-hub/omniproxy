@@ -1,4 +1,4 @@
-"""EMA‑based scoring for proxies."""
+"""EMA-based scoring for proxies."""
 
 from __future__ import annotations
 

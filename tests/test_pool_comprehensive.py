@@ -7,10 +7,16 @@ import asyncio
 import pytest
 from omniproxy import Proxy
 from omniproxy.config import PoolConfig
-from omniproxy.errors import MissingProxyMetadata, PoolCircuitOpenError, PoolExhausted, SessionBrokenError
+from omniproxy.errors import (
+    MissingProxyMetadata,
+    PoolCircuitOpenError,
+    PoolExhausted,
+    SessionBrokenError,
+)
 from omniproxy.pool import AsyncProxyPool, SyncProxyPool
 
 from tests.pool_configs import pool_with_exhausted_hook_comprehensive
+
 
 class TestCountryAndMetadata:
     def test_country_filter(self, s0: str, s1: str, minimal_round_robin_pool_config: PoolConfig) -> None:

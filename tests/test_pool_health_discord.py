@@ -16,10 +16,8 @@ import asyncio
 import random
 import threading
 import time
-from typing import List
 
 import pytest
-
 from omniproxy import CheckResult, Proxy
 from omniproxy.config import (
     CircuitBreakerConfig,
@@ -32,7 +30,7 @@ from omniproxy.config import (
     settings,
 )
 from omniproxy.constants import DEFAULT_TIMEOUT
-from omniproxy.enum import PoolStructure, PoolStrategy
+from omniproxy.enum import PoolStrategy, PoolStructure
 from omniproxy.errors import PoolCircuitOpenError, PoolExhausted
 from omniproxy.extended_proxy import run_health_check
 from omniproxy.pool import AsyncProxyPool, SyncProxyPool
@@ -80,7 +78,9 @@ class TestConfigValidation:
         assert settings.default_timeout == DEFAULT_TIMEOUT
 
     def test_global_singleton_is_frozen(self) -> None:
-        with pytest.raises(Exception):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             settings.default_timeout = -1.0  # type: ignore[misc]
 
     def test_concurrent_reads(self) -> None:
@@ -266,7 +266,7 @@ class TestProxyRandomisedFormats:
 
 
 # ---------------------------------------------------------------------------
-# Integration – Discord + real proxies (marked ``integration``)
+# Integration - Discord + real proxies (marked ``integration``)
 # ---------------------------------------------------------------------------
 
 
@@ -278,7 +278,7 @@ class TestDiscordHealthCheckIntegration:
         assert isinstance(result, CheckResult)
 
     def test_sync_pool_acquire_smoke(
-        self, integration_proxies: List[Proxy], discord_pool_without_circuit_pool_config: PoolConfig
+        self, integration_proxies: list[Proxy], discord_pool_without_circuit_pool_config: PoolConfig
     ) -> None:
         cfg = discord_pool_without_circuit_pool_config
         pool = SyncProxyPool(cfg, integration_proxies)
@@ -287,7 +287,7 @@ class TestDiscordHealthCheckIntegration:
         pool.close()
 
     def test_async_pool_smoke_acquire(
-        self, integration_proxies: List[Proxy], discord_pool_config: PoolConfig
+        self, integration_proxies: list[Proxy], discord_pool_config: PoolConfig
     ) -> None:
         async def _run() -> None:
             async with AsyncProxyPool(discord_pool_config, integration_proxies) as pool:
@@ -299,7 +299,7 @@ class TestDiscordHealthCheckIntegration:
 
     def test_cooldown_after_mark_failed(
         self,
-        integration_proxies: List[Proxy],
+        integration_proxies: list[Proxy],
         discord_pool_without_circuit_pool_config: PoolConfig,
     ) -> None:
         pool = SyncProxyPool(discord_pool_without_circuit_pool_config, integration_proxies)
@@ -318,7 +318,7 @@ class TestDiscordHealthCheckIntegration:
             pool.close()
 
     def test_circuit_breaker_with_many_failures(
-        self, integration_proxies: List[Proxy], discord_integration_strict_circuit_pool_config: PoolConfig
+        self, integration_proxies: list[Proxy], discord_integration_strict_circuit_pool_config: PoolConfig
     ) -> None:
         if len(integration_proxies) < 2:
             pytest.skip("Need at least two proxies")

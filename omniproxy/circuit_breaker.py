@@ -1,4 +1,4 @@
-"""Pool‑level circuit breaker state machine."""
+"""Pool-level circuit breaker state machine."""
 
 from __future__ import annotations
 
@@ -157,11 +157,14 @@ class CircuitBreaker:
             return self.state == CircuitBreakerState.CLOSED
 
         if self.state == CircuitBreakerState.OPEN:
-            if self.config.half_open_timeout > 0 and self._opened_at is not None:
-                if now - self._opened_at >= self.config.half_open_timeout:
-                    self._to_half_open()
-                    self._begin_probe(now)
-                    return True
+            if (
+                self.config.half_open_timeout > 0
+                and self._opened_at is not None
+                and now - self._opened_at >= self.config.half_open_timeout
+            ):
+                self._to_half_open()
+                self._begin_probe(now)
+                return True
             return False
 
         self._expire_stale_probe(now)

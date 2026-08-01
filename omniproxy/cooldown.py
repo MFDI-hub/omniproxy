@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .config import CooldownConfig
+    pass
 
 
 def coerce_exception_type(exception_type: object | None) -> type[BaseException] | None:

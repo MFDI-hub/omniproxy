@@ -1,10 +1,9 @@
 """Tests for proxy check functions: acheck_proxy, check_proxy, etc."""
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from omniproxy import CheckResult, Proxy, acheck_proxy, check_proxy
-from omniproxy.extended_proxy import arun_health_check, run_health_check
 
 
 class TestCheckProxy:

@@ -7,7 +7,7 @@ set of error types. Most users only need to import the symbols re-exported
 here.
 
 Version:
-    4.0.0
+    4.0.1
 """
 
 from __future__ import annotations
@@ -63,4 +63,4 @@ __all__ = [
     "settings",
 ]
 
-__version__ = "4.0.0"
+__version__ = "4.0.1"

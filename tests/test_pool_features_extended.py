@@ -7,7 +7,6 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from omniproxy import Proxy
 from omniproxy.config import (
     CircuitBreakerConfig,
@@ -28,7 +27,12 @@ from omniproxy.enum import (
     SessionCooldownPolicy,
     WarmupFailurePolicy,
 )
-from omniproxy.errors import PoolCircuitOpenError, PoolClosedError, PoolDrainingError, WarmupFailedError
+from omniproxy.errors import (
+    PoolCircuitOpenError,
+    PoolClosedError,
+    PoolDrainingError,
+    WarmupFailedError,
+)
 from omniproxy.extended_proxy import CheckResult
 from omniproxy.hooks import run_deferred
 from omniproxy.pool import AcquireOptions, AsyncProxyPool, SyncProxyPool
@@ -222,7 +226,7 @@ async def test_on_demand_fetchers_refill_when_empty_and_no_refresh_callbacks(s0:
 @pytest.mark.asyncio
 async def test_background_refresh_merges_new_once(monkeypatch: pytest.MonkeyPatch, s0: str, s3: str) -> None:
     cfg = pool_configs.extended_quick_close_only_config(drain_timeout=0.0).model_copy(
-        update={"refresh": RefreshConfig(sync_callback=lambda: [])}
+        update={"refresh": RefreshConfig(sync_callback=list)}
     )
     starter = Proxy(s0)
     newcomer = Proxy(s3)
@@ -787,9 +791,11 @@ async def test_mark_failed_rotation_error_still_fires_hooks() -> None:
 
     async with AsyncProxyPool(cfg, [p]) as pool:
         px = await pool.acquire()
-        with patch.object(Proxy, "arotate", new_callable=AsyncMock, side_effect=RuntimeError("rotate boom")):
-            with pytest.raises(RuntimeError, match="rotate boom"):
-                await pool.mark_failed(px, TimeoutError)
+        with (
+            patch.object(Proxy, "arotate", new_callable=AsyncMock, side_effect=RuntimeError("rotate boom")),
+            pytest.raises(RuntimeError, match="rotate boom"),
+        ):
+            await pool.mark_failed(px, TimeoutError)
         assert failed == [p.url]
         assert cooled == [p.url]
 
@@ -973,9 +979,11 @@ async def test_rotate_on_acquire_failure_releases_lease(
     )
 
     async with AsyncProxyPool(cfg, [p]) as pool:
-        with patch.object(Proxy, "arotate", new_callable=AsyncMock, side_effect=RuntimeError("rotate boom")):
-            with pytest.raises(RuntimeError, match="rotate boom"):
-                await pool.acquire()
+        with (
+            patch.object(Proxy, "arotate", new_callable=AsyncMock, side_effect=RuntimeError("rotate boom")),
+            pytest.raises(RuntimeError, match="rotate boom"),
+        ):
+            await pool.acquire()
         assert pool._connections.get(p.url, 0) == 0
 
         with patch.object(Proxy, "arotate", new_callable=AsyncMock, return_value=True):
@@ -1009,9 +1017,11 @@ async def test_post_acquire_unexpected_failure_releases_lease(s0: str) -> None:
     cfg = pool_configs.extended_quick_close_only_config(drain_timeout=0.0)
 
     async with AsyncProxyPool(cfg, [Proxy(s0)]) as pool:
-        with patch("omniproxy.pool.run_deferred", side_effect=RuntimeError("unexpected")):
-            with pytest.raises(RuntimeError, match="unexpected"):
-                await pool.acquire()
+        with (
+            patch("omniproxy.pool.run_deferred", side_effect=RuntimeError("unexpected")),
+            pytest.raises(RuntimeError, match="unexpected"),
+        ):
+            await pool.acquire()
         assert pool._connections.get(pool._proxies[0].url, 0) == 0
 
 

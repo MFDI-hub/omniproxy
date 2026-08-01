@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .proxy import Proxy
     from .config import SessionConfig
+    from .proxy import Proxy
 
 @dataclass(slots=True)
 class SessionEntry:
@@ -108,7 +108,7 @@ def resolve_session(
 def unbind_session(
     session_key: str,
     registry: dict[str, SessionEntry],
-    deferred: list,
+    _deferred: list,
 ) -> None:
     """Remove a sticky session binding.
 
@@ -116,7 +116,7 @@ def unbind_session(
         session_key (str): Identifier of the session to unbind.
         registry (dict[str, SessionEntry]): Session registry to mutate. The
             entry is removed if present; missing keys are ignored.
-        deferred (list): Reserved for future hook deferrals (currently
+        _deferred (list): Reserved for future hook deferrals (currently
             unused but kept for API stability).
 
     Returns:

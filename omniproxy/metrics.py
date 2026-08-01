@@ -1,4 +1,4 @@
-"""Built‑in Prometheus metrics exporter (optional)."""
+"""Built-in Prometheus metrics exporter (optional)."""
 
 from __future__ import annotations
 
@@ -114,7 +114,7 @@ class PrometheusExporter:
         Version:
             Added in 4.0.0.
         """
-        return None
+        return
 
 
 __all__: list[str] = ["PrometheusExporter"]

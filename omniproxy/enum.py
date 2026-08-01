@@ -119,6 +119,7 @@ __all__ = [
     "AnonymityLeakHeader",
     "AnonymityTier",
     "CircuitBreakerState",
+    "DeadLetterPersistence",
     "FilterMissingMetadata",
     "HttpBackend",
     "HttpVerb",
@@ -128,5 +129,4 @@ __all__ = [
     "ProxyProtocol",
     "SessionCooldownPolicy",
     "WarmupFailurePolicy",
-    "DeadLetterPersistence",
 ]

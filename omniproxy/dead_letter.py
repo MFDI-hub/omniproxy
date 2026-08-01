@@ -1,4 +1,4 @@
-"""Dead‑letter queue and retry logic."""
+"""Dead-letter queue and retry logic."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING, Any
 from .enum import DeadLetterPersistence
 
 if TYPE_CHECKING:
-    from .extended_proxy import Proxy
     from .config import DeadLetterConfig, StateStore
-    from .pool import AsyncProxyPool   # avoid circular import at runtime
+    from .extended_proxy import Proxy
+    from .pool import AsyncProxyPool  # avoid circular import at runtime
 
 logger = logging.getLogger(__name__)
 
@@ -210,9 +210,14 @@ async def retry_cycle(
 
         sem = pool._health_sem
 
-        async def bounded_check(entry: DeadLetterEntry) -> tuple[DeadLetterEntry, Any]:
-            async with sem:
-                return entry, await health_check_fn(entry.proxy, hc)
+        async def bounded_check(
+            entry: DeadLetterEntry,
+            *,
+            _sem: asyncio.Semaphore = sem,
+            _hc: Any = hc,
+        ) -> tuple[DeadLetterEntry, Any]:
+            async with _sem:
+                return entry, await health_check_fn(entry.proxy, _hc)
 
         results = await asyncio.gather(
             *(bounded_check(e) for e in entries),

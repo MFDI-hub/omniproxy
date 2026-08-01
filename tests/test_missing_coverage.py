@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import threading
 import time
 from unittest import mock
 
@@ -28,7 +27,7 @@ from tests.pool_configs import pool_with_on_exhausted
 
 
 # ===================================================================
-# 1. Proxy read‑only attributes, comparisons, serialisation
+# 1. Proxy read-only attributes, comparisons, serialisation
 # ===================================================================
 class TestProxyAttributes:
     def test_attribute_immutable(self, s0: str) -> None:
@@ -163,7 +162,7 @@ class TestHealthCheckFallback:
 
 
 # ===================================================================
-# 4. Weighted & lowest‑latency strategies + scoring / eviction
+# 4. Weighted & lowest-latency strategies + scoring / eviction
 # ===================================================================
 class TestWeightedLowestLatency:
     def test_weighted_bias_toward_faster_proxy(self, s0: str, s1: str, weighted_deterministic_bias_pool_config) -> None:
@@ -285,7 +284,7 @@ class TestOmniproxyConfigValidation:
 
 
 # ===================================================================
-# 10. Utils – batch_parse unsupported & pattern full collapse
+# 10. Utils - batch_parse unsupported & pattern full collapse
 # ===================================================================
 class TestUtilsEdgeCases:
     def test_batch_parse_invalid_raises(self) -> None:

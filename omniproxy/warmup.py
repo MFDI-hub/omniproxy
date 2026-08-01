@@ -1,4 +1,4 @@
-"""Warm‑up phase for new pools."""
+"""Warm-up phase for new pools."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .pool import AsyncProxyPool
     from .config import WarmupConfig
+    from .pool import AsyncProxyPool
 
 logger = logging.getLogger(__name__)
 

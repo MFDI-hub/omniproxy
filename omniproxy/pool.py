@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import threading
 import time
@@ -10,8 +11,10 @@ from collections import deque
 from dataclasses import dataclass, fields, replace
 from typing import TYPE_CHECKING, Any
 
+from .circuit_breaker import CircuitBreaker, CircuitBreakerState
 from .config import PoolConfig
 from .constants import ANONYMITY_RANKS
+from .cooldown import coerce_exception_type, compute_cooldown, is_in_cooldown
 from .enum import (
     DeadLetterPersistence,
     FilterMissingMetadata,
@@ -31,15 +34,13 @@ from .errors import (
     WarmupFailedError,
 )
 from .extended_proxy import Proxy
-from .cooldown import coerce_exception_type, compute_cooldown, is_in_cooldown
-from .circuit_breaker import CircuitBreaker, CircuitBreakerState
+from .hooks import run_deferred
 from .scoring import EMAState, update_ema
 from .session import SessionEntry, resolve_session
-from .hooks import run_deferred
 
 if TYPE_CHECKING:
-    from .fetchers.base import ProxyFetcher
     from .extended_proxy import CheckResult
+    from .fetchers.base import ProxyFetcher
     from .strategies import SelectionStrategy
 
 logger = logging.getLogger(__name__)
@@ -168,7 +169,7 @@ class AsyncProxyPool:
     def __init__(
         self,
         config: PoolConfig,
-        initial_proxies: list[Proxy] = [],
+        initial_proxies: list[Proxy] | None = None,
         fetchers: list[ProxyFetcher] | None = None,
     ) -> None:
         """Build the pool with the given config, seed proxies, and fetchers.
@@ -183,6 +184,8 @@ class AsyncProxyPool:
         Version:
             Added in 4.0.0.
         """
+        if initial_proxies is None:
+            initial_proxies = []
         self._config: PoolConfig = config
         self._fetchers = fetchers or []
         self._state_lock = asyncio.Lock()
@@ -203,15 +206,14 @@ class AsyncProxyPool:
         self._session_registry: dict[str, SessionEntry] = {}
         self._dead_letter_store: Any | None = None
         self._dead_letter_queue: list[Any] = []
-        if config.dead_letter.enabled:
-            if (
-                config.dead_letter.persistence == DeadLetterPersistence.STATE_STORE
-                and config.state_store_factory is not None
-            ):
-                from .dead_letter import load_queue
+        if config.dead_letter.enabled and (
+            config.dead_letter.persistence == DeadLetterPersistence.STATE_STORE
+            and config.state_store_factory is not None
+        ):
+            from .dead_letter import load_queue
 
-                self._dead_letter_store = config.state_store_factory()
-                self._dead_letter_queue = load_queue(self._dead_letter_store)
+            self._dead_letter_store = config.state_store_factory()
+            self._dead_letter_queue = load_queue(self._dead_letter_store)
         self._circuit_breaker = (
             CircuitBreaker(config.circuit_breaker) if config.circuit_breaker else None
         )
@@ -361,8 +363,8 @@ class AsyncProxyPool:
                     self._spawn_background_tasks()
 
                 if self._config.warmup.enabled:
-                    from .warmup import run_warmup
                     from .extended_proxy import arun_health_check
+                    from .warmup import run_warmup
 
                     warmup_hooks: list[tuple[str, tuple]] = []
                     if self._config.hooks.on_warmup_started:
@@ -420,10 +422,8 @@ class AsyncProxyPool:
         for task in tasks:
             task.cancel()
         for task in tasks:
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
         self._background_tasks.clear()
         self._bg_health = None
         self._bg_dead = None
@@ -513,10 +513,10 @@ class AsyncProxyPool:
             Added in 4.0.0.
         """
         from .strategies import (
-            RoundRobinStrategy,
-            RandomStrategy,
-            WeightedStrategy,
             LowestLatencyStrategy,
+            RandomStrategy,
+            RoundRobinStrategy,
+            WeightedStrategy,
         )
         mapping = {
             PoolStrategy.ROUND_ROBIN: RoundRobinStrategy,
@@ -596,10 +596,8 @@ class AsyncProxyPool:
             Added in 4.0.0.
         """
         wait_time = self._bounded_wait_timeout(remaining)
-        try:
+        with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(self._available_cond.wait(), wait_time)
-        except asyncio.TimeoutError:
-            pass
 
     def _return_lease(self, proxy: Proxy, *, count_release_stat: bool) -> None:
         """Release one acquire lease for ``proxy``.
@@ -1180,9 +1178,7 @@ class AsyncProxyPool:
                 proxy, attr, filter_val, ignore_missing=ignore_missing
             ):
                 return False
-        if options.accept_callback and not options.accept_callback(proxy):
-            return False
-        return True
+        return not (options.accept_callback and not options.accept_callback(proxy))
 
     def _get_eligible(self, options: AcquireOptions) -> list[Proxy]:
         """Return the list of proxies eligible for selection right now.
@@ -1473,11 +1469,11 @@ class AsyncProxyPool:
         if deferred is not None and self._config.hooks.on_auto_evicted:
             deferred.append(("on_auto_evicted", (proxy, reason)))
 
-    async def _attempt_on_demand_refresh(self, options: AcquireOptions) -> bool:
+    async def _attempt_on_demand_refresh(self, _options: AcquireOptions) -> bool:
         """Run a single refresh cycle under the refresh lock.
 
         Args:
-            options (AcquireOptions): Acquire-time filters (currently unused
+            _options (AcquireOptions): Acquire-time filters (currently unused
                 but kept for forward compatibility).
 
         Returns:
@@ -1674,8 +1670,12 @@ class AsyncProxyPool:
 
                 sem = self._health_sem
 
-                async def bounded_check(p: Proxy):
-                    async with sem:
+                async def bounded_check(
+                    p: Proxy,
+                    *,
+                    _sem: asyncio.Semaphore = sem,
+                ):
+                    async with _sem:
                         # arun_health_check returns (Proxy, CheckResult)
                         return await arun_health_check(p, hc)
 

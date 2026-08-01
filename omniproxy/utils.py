@@ -398,11 +398,11 @@ def get_formatted_proxy_string(proxy: Proxy | OmniproxyParser, pattern: str | Pr
 
     if isinstance(pattern, ProxyPattern):
         fmt = (
-            getattr(pattern, "_fmt_auth")
+            pattern._fmt_auth
             if dumped.get("username")
-            else getattr(pattern, "_fmt_noauth")
+            else pattern._fmt_noauth
         )
-        if not dumped.get("rotation_url") and getattr(pattern, "_has_rotation_brackets"):
+        if not dumped.get("rotation_url") and pattern._has_rotation_brackets:
             fmt = REMOVE_BRACKETS_RE.sub("", fmt)
             fmt = _collapse_pattern_after_optional_fields(fmt)
         sub = _substitution_kwargs(dumped)

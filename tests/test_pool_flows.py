@@ -13,7 +13,6 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from omniproxy import Proxy, ProxyPool
 from omniproxy.config import (
     CircuitBreakerConfig,
@@ -47,23 +46,24 @@ from omniproxy.errors import (
 from omniproxy.extended_proxy import CheckResult
 from omniproxy.hooks import run_deferred
 from omniproxy.pool import AsyncProxyPool, SyncProxyPool
+
 from tests.conftest import proxy_with_meta
 
 
 def _quiet(**updates: Any) -> PoolConfig:
     """Minimal pool config with health/scoring/breaker off unless overridden."""
-    base = dict(
-        strategy=PoolStrategy.ROUND_ROBIN,
-        health_check=None,
-        circuit_breaker=None,
-        scoring=None,
-        cooldown=CooldownConfig(base=10.0, min=0.05, max=60.0, adaptive=False, failure_threshold=2),
-        acquire_timeout=2.0,
-        wait_fallback_interval=0.05,
-        limits=LimitsConfig(max_connections_per_proxy=5),
-        log_level=50,
-        drain_timeout=0.0,
-    )
+    base = {
+        "strategy": PoolStrategy.ROUND_ROBIN,
+        "health_check": None,
+        "circuit_breaker": None,
+        "scoring": None,
+        "cooldown": CooldownConfig(base=10.0, min=0.05, max=60.0, adaptive=False, failure_threshold=2),
+        "acquire_timeout": 2.0,
+        "wait_fallback_interval": 0.05,
+        "limits": LimitsConfig(max_connections_per_proxy=5),
+        "log_level": 50,
+        "drain_timeout": 0.0,
+    }
     base.update(updates)
     return PoolConfig(**base)
 
@@ -203,9 +203,8 @@ class TestFlow03Acquire:
         async with AsyncProxyPool(cfg, [proxy]) as pool:
             with patch.object(
                 Proxy, "arotate", new_callable=AsyncMock, side_effect=RuntimeError("boom")
-            ):
-                with pytest.raises(RuntimeError, match="boom"):
-                    await pool.acquire()
+            ), pytest.raises(RuntimeError, match="boom"):
+                await pool.acquire()
             assert pool._connections.get(proxy.url, 0) == 0
             with patch.object(Proxy, "arotate", new_callable=AsyncMock, return_value=True):
                 p = await pool.acquire()
@@ -589,7 +588,7 @@ class TestFlow10CircuitBreaker:
             acquire_timeout=2.0,
         )
         with SyncProxyPool(cfg, live_proxies[:3]) as pool:
-            for px in live_proxies[:3]:
+            for _px in live_proxies[:3]:
                 for _ in range(3):
                     try:
                         p = pool.acquire()
@@ -783,8 +782,10 @@ class TestFlow13ConfigPresets:
         assert c.health_check is not None
 
     def test_presets_are_frozen(self) -> None:
+        from pydantic import ValidationError
+
         c = PoolConfig.scraping_preset()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             c.acquire_timeout = 1.0  # type: ignore[misc]
 
     @pytest.mark.integration

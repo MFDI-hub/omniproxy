@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import random
-from collections import deque
 from typing import Any, Protocol
 
 from .proxy import Proxy
 from .scoring import EMAState
+
 
 class SelectionStrategy(Protocol):
     """Protocol implemented by every pool selection strategy.
@@ -70,14 +70,14 @@ class RoundRobinStrategy:
     def select(
         self,
         eligible: list[Proxy],
-        scores: dict[str, EMAState],
+        _scores: dict[str, EMAState],
         context: Any,
     ) -> Proxy | None:
         """Return the next proxy in round-robin order.
 
         Args:
             eligible (list[Proxy]): Candidate proxies.
-            scores (dict[str, EMAState]): Unused.
+            _scores (dict[str, EMAState]): Unused.
             context (Any): Full ordered pool proxy list (``deque`` or
                 ``list``). When omitted, falls back to indexing ``eligible``.
 
@@ -116,15 +116,15 @@ class RandomStrategy:
     def select(
         self,
         eligible: list[Proxy],
-        scores: dict[str, EMAState],
-        context: Any,
+        _scores: dict[str, EMAState],
+        _context: Any,
     ) -> Proxy | None:
         """Pick a proxy uniformly at random.
 
         Args:
             eligible (list[Proxy]): Candidate proxies.
-            scores (dict[str, EMAState]): Unused.
-            context (Any): Unused.
+            _scores (dict[str, EMAState]): Unused.
+            _context (Any): Unused.
 
         Returns:
             Proxy | None: A random proxy, or ``None`` when ``eligible`` is empty.
@@ -151,14 +151,14 @@ class WeightedStrategy:
         self,
         eligible: list[Proxy],
         scores: dict[str, EMAState],
-        context: Any,
+        _context: Any,
     ) -> Proxy | None:
         """Pick a proxy with probability proportional to its score.
 
         Args:
             eligible (list[Proxy]): Candidate proxies.
             scores (dict[str, EMAState]): EMA states keyed by proxy URL.
-            context (Any): Unused.
+            _context (Any): Unused.
 
         Returns:
             Proxy | None: Selected proxy, or ``None`` when ``eligible`` is empty.
@@ -174,13 +174,13 @@ class WeightedStrategy:
             state: EMAState | None = scores.get(p.url)
             if state:
                 from .scoring import compute_score
-                weights.append(max(0.01, compute_score(state)))  # ensure non‑zero
+                weights.append(max(0.01, compute_score(state)))  # ensure non-zero
             else:
                 weights.append(0.01)
         total: int | float = sum(weights)
         r: int | float = random.uniform(a=0, b=total)
         upto = 0.0
-        for proxy, w in zip(eligible, weights):
+        for proxy, w in zip(eligible, weights, strict=False):
             upto += w
             if upto >= r:
                 return proxy
@@ -201,14 +201,14 @@ class LowestLatencyStrategy:
         self,
         eligible: list[Proxy],
         scores: dict[str, EMAState],
-        context: Any,
+        _context: Any,
     ) -> Proxy | None:
         """Pick the proxy with the smallest ``latency_ema``.
 
         Args:
             eligible (list[Proxy]): Candidate proxies.
             scores (dict[str, EMAState]): EMA states keyed by proxy URL.
-            context (Any): Unused.
+            _context (Any): Unused.
 
         Returns:
             Proxy | None: The best proxy, or ``None`` when ``eligible`` is

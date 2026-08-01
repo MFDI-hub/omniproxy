@@ -1,18 +1,18 @@
-"""Process‑wide configuration for omniproxy (Pydantic v2 edition).
+"""Process-wide configuration for omniproxy (Pydantic v2 edition).
 
 The module exposes:
-- :class:`GlobalConfig` (process‑wide defaults, replace the old ``OmniproxyConfig``)
-- :class:`PoolConfig` (orchestrates sub‑configs)
+- :class:`GlobalConfig` (process-wide defaults, replace the old ``OmniproxyConfig``)
+- :class:`PoolConfig` (orchestrates sub-configs)
 - Presets: :meth:`PoolConfig.scraping_preset`, etc.
 
-All types are fully hinted – no ``Any`` in public signatures.
+All types are fully hinted - no ``Any`` in public signatures.
 """
 from __future__ import annotations
 
 import logging
 import warnings
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import (
     BaseModel,
@@ -34,12 +34,12 @@ from .constants import (
     VALID_BACKENDS,
 )
 from .enum import (
+    DeadLetterPersistence,
     FilterMissingMetadata,
     PoolStrategy,
     PoolStructure,
     SessionCooldownPolicy,
     WarmupFailurePolicy,
-    DeadLetterPersistence,
 )
 
 Strategy = PoolStrategy
@@ -220,7 +220,7 @@ def bool_to_score(ok: bool) -> float:
     """
     return 1.0 if ok else 0.0
 
-# ---------- Sub‑config models (Pydantic v2) ----------
+# ---------- Sub-config models (Pydantic v2) ----------
 class ScoringConfig(BaseModel):
     """Configuration for the latency/success scoring engine.
 
@@ -341,7 +341,7 @@ class HealthCheckConfig(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
     recovery_interval: float = 60.0
     check_interval: float | None = None
-    custom_check: Callable[["Proxy"], bool] | None = None
+    custom_check: Callable[[Proxy], bool] | None = None
 
 class LimitsConfig(BaseModel):
     """Per-proxy concurrency and rate limits.
@@ -364,7 +364,7 @@ class LimitsConfig(BaseModel):
     max_connections_per_proxy: int | None = None
     max_rps_per_proxy: float | None = None
     token_bucket_capacity: float = 1.0
-    token_bucket_factory: Callable[["Proxy"], Any] | None = None
+    token_bucket_factory: Callable[[Proxy], Any] | None = None
 
     @model_validator(mode="after")
     def _validate_limits(self) -> LimitsConfig:
@@ -434,25 +434,25 @@ class LifecycleHooks(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    on_proxy_acquired: Callable[["Proxy"], None] | None = None
-    on_proxy_released: Callable[["Proxy"], None] | None = None
-    on_proxy_failed: Callable[["Proxy", type | None], None] | None = None
-    on_proxy_cooled_down: Callable[["Proxy"], None] | None = None
-    on_proxy_recovered: Callable[["Proxy"], None] | None = None
+    on_proxy_acquired: Callable[[Proxy], None] | None = None
+    on_proxy_released: Callable[[Proxy], None] | None = None
+    on_proxy_failed: Callable[[Proxy, type | None], None] | None = None
+    on_proxy_cooled_down: Callable[[Proxy], None] | None = None
+    on_proxy_recovered: Callable[[Proxy], None] | None = None
     on_exhausted: Callable[[], None] | None = None
     on_saturated: Callable[[], None] | None = None
-    on_check_complete: Callable[["Proxy", CheckResult], None] | None = None
+    on_check_complete: Callable[[Proxy, CheckResult], None] | None = None
     on_refresh_started: Callable[[], None] | None = None
     on_refresh_completed: Callable[[int], None] | None = None
     on_warmup_started: Callable[[], None] | None = None
     on_warmup_completed: Callable[[int, int], None] | None = None
     on_circuit_open: Callable[[], None] | None = None
     on_circuit_close: Callable[[], None] | None = None
-    on_auto_evicted: Callable[["Proxy", str], None] | None = None
-    on_session_rebind: Callable[[str, "Proxy", "Proxy"], None] | None = None
+    on_auto_evicted: Callable[[Proxy, str], None] | None = None
+    on_session_rebind: Callable[[str, Proxy, Proxy], None] | None = None
     on_draining: Callable[[], None] | None = None
     on_config_updated: Callable[[set[str]], None] | None = None
-    on_dead_letter_added: Callable[["Proxy", str | None], None] | None = None
+    on_dead_letter_added: Callable[[Proxy, str | None], None] | None = None
 
 # ---------- Inner configurators for PoolConfig ----------
 class CooldownConfig(BaseModel):
@@ -507,7 +507,7 @@ class WarmupConfig(BaseModel):
     min_ready: int = 0
     timeout: float = 30.0
     failure_policy: WarmupFailurePolicy = WarmupFailurePolicy.RAISE
-    validator: Callable[["Proxy"], float] | None = None   # float
+    validator: Callable[[Proxy], float] | None = None   # float
 
 class RefreshConfig(BaseModel):
     """Periodic background refresh configuration.
@@ -530,10 +530,10 @@ class RefreshConfig(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    sync_callback: Callable[[], list["Proxy"]] | None = None
-    async_callback: Callable[[], Awaitable[list["Proxy"]]] | None = None
-    fallback_sync_callbacks: list[Callable[[], list["Proxy"]]] = Field(default_factory=list)
-    fallback_async_callbacks: list[Callable[[], Awaitable[list["Proxy"]]]] = Field(default_factory=list)
+    sync_callback: Callable[[], list[Proxy]] | None = None
+    async_callback: Callable[[], Awaitable[list[Proxy]]] | None = None
+    fallback_sync_callbacks: list[Callable[[], list[Proxy]]] = Field(default_factory=list)
+    fallback_async_callbacks: list[Callable[[], Awaitable[list[Proxy]]]] = Field(default_factory=list)
     timeout: float = 10.0
     interval_seconds: float = 300.0
 
@@ -658,7 +658,7 @@ class GlobalConfig(BaseModel):
             raise TypeError(f"{info.field_name} must be a list/tuple")
         for i, item in enumerate(v):
             if not isinstance(item, str) or not item.strip():
-                raise ValueError(f"{info.field_name}[{i}] must be a non‑empty string")
+                raise ValueError(f"{info.field_name}[{i}] must be a non-empty string")
         return tuple(v)
 
     @model_validator(mode="after")
@@ -675,7 +675,7 @@ class GlobalConfig(BaseModel):
             Added in 4.0.0.
         """
         if not self.default_check_urls:
-            raise ValueError("default_check_urls must be non‑empty")
+            raise ValueError("default_check_urls must be non-empty")
         return self
 
 # Singleton (immutable, so no lock needed after creation)
@@ -757,26 +757,26 @@ class PoolConfig(BaseModel):
     circuit_breaker: CircuitBreakerConfig | None = None
     dead_letter: DeadLetterConfig = Field(default_factory=DeadLetterConfig)
 
-    # ----- Pool‑wide meta fields -----
+    # ----- Pool-wide meta fields -----
     # acquire_timeout: 0 = no condition wait (still tries on-demand refresh), >0 = timed wait, <0 = wait forever
     acquire_timeout: float = 0.0
     wait_fallback_interval: float = 0.25
     filter_missing_metadata: FilterMissingMetadata = FilterMissingMetadata.SKIP
-    accept_callback: Callable[["Proxy", dict], bool] | None = None
+    accept_callback: Callable[[Proxy, dict], bool] | None = None
     auto_mark_failed_on_exception: bool = True
     auto_mark_success_on_exit: bool = False
     reraise: bool = True
-    dedup_key: Callable[["Proxy"], str] | None = None
+    dedup_key: Callable[[Proxy], str] | None = None
     acquire_tags: set[str] | None = None
     use_rotation_urls: bool = False
     rotate_on_acquire: bool = False
     rotate_on_failure: bool = False
-    backend_override: Callable[["Proxy"], str | None] | None = None
+    backend_override: Callable[[Proxy], str | None] | None = None
     drain_timeout: float = 30.0
     min_size: int | None = None
     max_size: int | None = None
     ignore_exceptions: tuple[type, ...] = ()
-    proxy_failure_classifier: Callable[[BaseException, Optional["Proxy"]], bool] | None = None
+    proxy_failure_classifier: Callable[[BaseException, Proxy | None], bool] | None = None
     metrics_exporter: Any | None = None
     log_level: int = logging.INFO
     state_store_factory: Callable[[], Any] | None = None
@@ -918,7 +918,7 @@ class PoolConfig(BaseModel):
             circuit_breaker=CircuitBreakerConfig(failure_ratio=0.6, half_open_timeout=15.0,
                                                  min_throughput=20),
             session=SessionConfig(cooldown_policy=SessionCooldownPolicy.REBIND),
-            warmup=WarmupConfig(enabled=False),                         # no warm‑up needed for scraping
+            warmup=WarmupConfig(enabled=False),                         # no warm-up needed for scraping
             health_check=None,                                          # rely on runtime failure detection
             auto_mark_failed_on_exception=True,
             auto_mark_success_on_exit=True,
@@ -1050,9 +1050,9 @@ class PoolConfig(BaseModel):
             cooldown=CooldownConfig(base=30.0, adaptive=False, failure_threshold=1),
             acquire_timeout=0.0,
             limits=LimitsConfig(),
-            scoring=None,                          # no scoring – aggressive health checks only
+            scoring=None,                          # no scoring - aggressive health checks only
             circuit_breaker=None,
-            warmup=WarmupConfig(enabled=False),    # warm‑up off; health checks run on failure
+            warmup=WarmupConfig(enabled=False),    # warm-up off; health checks run on failure
             health_check=HealthCheckConfig(recovery_interval=10.0),
             auto_mark_failed_on_exception=True,
             auto_mark_success_on_exit=False,

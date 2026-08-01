@@ -189,6 +189,7 @@ class Proxy(str):
     """
 
     __slots__ = (
+        "_url",  # cached canonical URL
         "anonymity",
         "asn",
         "city",
@@ -198,12 +199,11 @@ class Proxy(str):
         "last_status",
         "latency",
         "org",
-        "tags",
-        "_url",  # cached canonical URL
         "password",
         "port",
         "protocol",
         "rotation_url",
+        "tags",
         "username",
     )
 

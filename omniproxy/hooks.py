@@ -1,10 +1,10 @@
 """Deferred lifecycle hook execution."""
 
 from __future__ import annotations
-from logging import Logger
 
-from typing import TYPE_CHECKING, Any
 import asyncio
+from logging import Logger
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .config import LifecycleHooks

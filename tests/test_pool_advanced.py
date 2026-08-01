@@ -13,6 +13,7 @@ from omniproxy.pool import AsyncProxyPool, SyncProxyPool
 
 from tests.conftest import proxy_with_meta
 
+
 class TestWeightedLowestLatency:
     def test_weighted_selection(self, s0, s1, weighted_scoring_pool_config):
         cfg = weighted_scoring_pool_config

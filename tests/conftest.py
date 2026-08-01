@@ -1,14 +1,13 @@
 """Pytest configuration and shared fixtures for omniproxy tests."""
 
-import asyncio
 import json
 import os
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator, List
+from typing import Any
 
 import pytest
 from dotenv import load_dotenv
-
 from omniproxy import Proxy
 from omniproxy.config import (
     CircuitBreakerConfig,
@@ -21,6 +20,7 @@ from omniproxy.config import (
     SessionConfig,
 )
 from omniproxy.enum import PoolStrategy, SessionCooldownPolicy
+
 from tests import pool_configs
 from tests.proxy_seeds import all_seeds, seeds
 
@@ -40,34 +40,34 @@ def pytest_configure(config):
 # ----------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def proxy_strings() -> List[str]:
+def proxy_strings() -> list[str]:
     """All proxy strings from PROXY_LIST or synthetic fallback."""
     return all_seeds()
 
 
 @pytest.fixture(scope="session")
-def proxy_list(proxy_strings: List[str]) -> List[Proxy]:
+def proxy_list(proxy_strings: list[str]) -> list[Proxy]:
     """Proxy objects for all seeds."""
     return [Proxy(s) for s in proxy_strings]
 
 
 @pytest.fixture(scope="session")
-def s0(proxy_strings: List[str]) -> str:
+def s0(proxy_strings: list[str]) -> str:
     return seeds(1)[0]
 
 
 @pytest.fixture(scope="session")
-def s1(proxy_strings: List[str]) -> str:
+def s1(proxy_strings: list[str]) -> str:
     return seeds(2)[1]
 
 
 @pytest.fixture(scope="session")
-def s2(proxy_strings: List[str]) -> str:
+def s2(proxy_strings: list[str]) -> str:
     return seeds(3)[2]
 
 
 @pytest.fixture(scope="session")
-def s3(proxy_strings: List[str]) -> str:
+def s3(proxy_strings: list[str]) -> str:
     return seeds(4)[3]
 
 
@@ -135,7 +135,7 @@ def offline_pool_config() -> PoolConfig:
 
 @pytest.fixture
 def mock_backend() -> Generator[Any, None, None]:
-    from unittest.mock import MagicMock, AsyncMock, patch
+    from unittest.mock import AsyncMock, MagicMock, patch
     mock = MagicMock(spec=['get', 'aget', 'request_direct', 'arequest_direct'])
     mock.get = MagicMock()
     mock.aget = AsyncMock()
@@ -150,7 +150,7 @@ def mock_backend() -> Generator[Any, None, None]:
 # Live / integration helpers
 # ----------------------------------------------------------------------
 
-def _parse_proxy_list() -> List[str]:
+def _parse_proxy_list() -> list[str]:
     raw = os.getenv("PROXY_LIST", "").strip()
     if not raw:
         return []
@@ -170,7 +170,7 @@ def _live_configured() -> bool:
 
 
 @pytest.fixture
-def live_proxies() -> List[Proxy]:
+def live_proxies() -> list[Proxy]:
     """Return real proxies from PROXY_LIST when live tests are enabled."""
     if os.getenv("OMNIPROXY_LIVE_TESTS") != "1" or not _live_configured():
         pytest.skip("Live tests not enabled (set OMNIPROXY_LIVE_TESTS=1 and PROXY_LIST+TOKEN)")
@@ -178,7 +178,7 @@ def live_proxies() -> List[Proxy]:
 
 
 @pytest.fixture
-def integration_proxies() -> List[Proxy]:
+def integration_proxies() -> list[Proxy]:
     """Return real proxies for integration tests (requires PROXY_LIST & TOKEN)."""
     proxies = _parse_proxy_list()
     if not proxies:
