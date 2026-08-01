@@ -102,6 +102,10 @@ Issues = "https://github.com/MFDI-hub/omniproxy/issues"
 
 [project.scripts]
 omniproxy = "omniproxy.cli:main"
+context-dump = "scripts.context_dump:main"
+
+[tool.hatch.build]
+dev-mode-dirs = ["."]
 
 [tool.hatch.build.targets.wheel]
 packages = ["omniproxy"]

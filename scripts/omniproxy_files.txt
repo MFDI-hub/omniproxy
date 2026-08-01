@@ -1,0 +1,16 @@
+# Paths synced into outputs/builds/omniproxy_dump.txt
+# One path per line (optional path:start-end line ranges).
+# Directories are scanned for --ext (default: py,md).
+# Used by: context-dump / uv run python scripts/context_dump.py
+
+# ADRs
+docs/adr/0001-library-scope-not-proxy-server.md
+docs/adr/0002-proxy-as-str-subclass.md
+docs/adr/0003-pluggable-http-backends.md
+docs/adr/0004-async-first-pool-sync-bridge.md
+docs/adr/0005-explicit-lease-lifecycle.md
+docs/adr/0006-frozen-pydantic-config-presets.md
+docs/adr/0007-circuit-breaker-client-outcomes-only.md
+docs/adr/0008-selection-strategies-and-ema-scoring.md
+docs/adr/0009-sticky-sessions-and-rotation-urls.md
+docs/adr/0010-pluggable-fetchers-refresh-dead-letter.md

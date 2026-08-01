@@ -78,6 +78,35 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Architecture:
+      - ADRs: adr/README.md
+      - 0001 Library scope: adr/0001-library-scope-not-proxy-server.md
+      - 0002 Proxy as str subclass: adr/0002-proxy-as-str-subclass.md
+      - 0003 Pluggable HTTP backends: adr/0003-pluggable-http-backends.md
+      - 0004 Async-first pool: adr/0004-async-first-pool-sync-bridge.md
+      - 0005 Explicit lease lifecycle: adr/0005-explicit-lease-lifecycle.md
+      - 0006 Frozen config presets: adr/0006-frozen-pydantic-config-presets.md
+      - 0007 Circuit breaker signals: adr/0007-circuit-breaker-client-outcomes-only.md
+      - 0008 Selection and scoring: adr/0008-selection-strategies-and-ema-scoring.md
+      - 0009 Sessions and rotation: adr/0009-sticky-sessions-and-rotation-urls.md
+      - 0010 Fetchers and dead-letter: adr/0010-pluggable-fetchers-refresh-dead-letter.md
+      - Pool flows:
+          - Overview: pool-flows/README.md
+          - 01 Async pool start: pool-flows/01-async-pool-start.md
+          - 02 Sync pool start: pool-flows/02-sync-pool-start.md
+          - 03 Acquire: pool-flows/03-acquire.md
+          - 04 Release: pool-flows/04-release.md
+          - 05 Mark success: pool-flows/05-mark-success.md
+          - 06 Mark failed: pool-flows/06-mark-failed.md
+          - 07 Close drain: pool-flows/07-close-drain.md
+          - 08 Refresh merge: pool-flows/08-refresh-merge.md
+          - 09 Sticky sessions: pool-flows/09-sticky-sessions.md
+          - 10 Circuit breaker: pool-flows/10-circuit-breaker.md
+          - 11 Health-check loop: pool-flows/11-health-check-loop.md
+          - 12 Warmup: pool-flows/12-warmup.md
+          - 13 Config presets: pool-flows/13-config-presets.md
+          - 14 Statistics metrics: pool-flows/14-statistics-metrics.md
+          - 15 Dead letter: pool-flows/15-dead-letter.md
   - Reference:
       - Overview: reference/overview.md
       - Proxy: reference/proxy.md

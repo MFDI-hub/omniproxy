@@ -44,6 +44,14 @@ class TestConfigValidation:
         with pytest.raises(ValueError):
             PoolConfig(scoring=ScoringConfig(success_weight=0.5, latency_weight=1.0))
 
+    def test_scoring_decay_factor_must_be_exclusive_unit_interval(self) -> None:
+        with pytest.raises(ValueError, match="decay_factor"):
+            ScoringConfig(decay_factor=0.0)
+        with pytest.raises(ValueError, match="decay_factor"):
+            ScoringConfig(decay_factor=1.0)
+        with pytest.raises(ValueError, match="decay_factor"):
+            PoolConfig(scoring=ScoringConfig(decay_factor=1.5))
+
     def test_warmup_requires_healthcheck(self) -> None:
         with pytest.raises(ValueError):
             PoolConfig(warmup=WarmupConfig(enabled=True), health_check=None)

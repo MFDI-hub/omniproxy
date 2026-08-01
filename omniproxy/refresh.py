@@ -108,14 +108,22 @@ async def fetch_from_refresh_config(config: RefreshConfig) -> list[Proxy]:
     return await _run_callback(config)
 
 
-async def fetch_from_fetchers(fetchers: list[ProxyFetcher]) -> list[Proxy]:
+async def fetch_from_fetchers(
+    fetchers: list[ProxyFetcher],
+    *,
+    timeout: float = 10.0,
+) -> list[Proxy]:
     """Aggregate proxies from a list of fetchers with deduplication.
 
-    Each fetcher is awaited in order. Items that cannot be parsed are
-    dropped; the remainder are deduplicated by canonical proxy URL.
+    Each fetcher is awaited in order, bounded by ``timeout`` so a single
+    hung source cannot stall refresh indefinitely. Items that cannot be
+    parsed are dropped; the remainder are deduplicated by canonical proxy
+    URL.
 
     Args:
         fetchers (list[ProxyFetcher]): Ordered list of fetchers to query.
+        timeout (float): Maximum seconds allowed per ``fetcher.fetch()``
+            call. Defaults to ``10.0`` (same as :class:`RefreshConfig`).
 
     Returns:
         list[Proxy]: Unique validated proxies in first-seen order.
@@ -127,7 +135,7 @@ async def fetch_from_fetchers(fetchers: list[ProxyFetcher]) -> list[Proxy]:
     collected: list[Proxy] = []
     for fetcher in fetchers:
         try:
-            raw = await fetcher.fetch()
+            raw = await asyncio.wait_for(fetcher.fetch(), timeout=timeout)
         except Exception:
             logger.warning("Fetcher %r failed", fetcher, exc_info=True)
             continue

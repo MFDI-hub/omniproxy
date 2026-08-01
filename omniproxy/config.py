@@ -226,7 +226,8 @@ class ScoringConfig(BaseModel):
 
     Attributes:
         window_seconds (float): Length of the rolling observation window.
-        decay_factor (float): Exponential decay applied to older samples.
+        decay_factor (float): Exponential decay applied to older samples;
+            must be in ``(0, 1)`` exclusive.
         success_weight (float): Weight applied to success ratio
             (must sum to 1.0 with ``latency_weight``).
         latency_weight (float): Weight applied to inverse-latency
@@ -248,6 +249,23 @@ class ScoringConfig(BaseModel):
     min_samples: int = 5
     eviction_threshold: float = 0.2
     eviction_grace_period: float = 60.0
+
+    @model_validator(mode="after")
+    def _validate_scoring_config(self) -> ScoringConfig:
+        """Validate single-field scoring constraints.
+
+        Returns:
+            ScoringConfig: The validated instance.
+
+        Raises:
+            ValueError: If ``decay_factor`` is not in ``(0, 1)`` exclusive.
+
+        Version:
+            Added in 4.0.0.
+        """
+        if self.decay_factor <= 0 or self.decay_factor >= 1:
+            raise ValueError("scoring.decay_factor must be between 0 and 1 exclusive")
+        return self
 
 class CircuitBreakerConfig(BaseModel):
     """Tuning knobs for the pool-wide :class:`CircuitBreaker`.
@@ -474,7 +492,8 @@ class WarmupConfig(BaseModel):
         enabled (bool): Toggle the warmup phase.
         min_ready (int): Minimum number of validated proxies required to
             consider warmup successful.
-        timeout (float): Maximum seconds the warmup phase may take.
+        timeout (float): Hard deadline for the whole warmup phase, including
+            in-flight health checks (unfinished probes are cancelled).
         failure_policy (WarmupFailurePolicy): Action when warmup fails (raise, partial, ignore).
         validator (Callable[[Proxy], float] | None): Optional custom validator
             returning a score in ``[0.0, 1.0]``.
@@ -502,7 +521,8 @@ class RefreshConfig(BaseModel):
             fallbacks tried in order when the primary fails.
         fallback_async_callbacks (list[Callable[[], Awaitable[list[Proxy]]]]):
             Async fallbacks tried in order when the primary fails.
-        timeout (float): Maximum seconds for a refresh attempt.
+        timeout (float): Maximum seconds for each refresh callback or
+            fetcher ``fetch()`` call.
         interval_seconds (float): Period between refresh attempts.
 
     Version:
@@ -766,12 +786,12 @@ class PoolConfig(BaseModel):
     def _validate_pool_config(self) -> PoolConfig:
         """Cross-field validation for :class:`PoolConfig`.
 
-        Verifies that scoring weights sum to ``1.0``, warmup has a health
-        check, cooldown bounds are sane, refresh timing is sensible, sizes
-        are non-negative, dead-letter values are valid, the circuit breaker
-        configuration is in range, and that score-dependent strategies have
-        a scoring config. Emits warnings for soft inconsistencies
-        (e.g. rotation URLs without ``rotate_on_acquire``).
+        Verifies that scoring weights sum to ``1.0``, warmup and dead-letter
+        have a health check when enabled, cooldown bounds are sane, refresh
+        timing is sensible, sizes are non-negative, dead-letter values are
+        valid, the circuit breaker configuration is in range, and that
+        score-dependent strategies have a scoring config. Emits warnings for
+        soft inconsistencies (e.g. rotation URLs without ``rotate_on_acquire``).
 
         Returns:
             PoolConfig: The validated instance.
@@ -826,6 +846,8 @@ class PoolConfig(BaseModel):
 
         # dead letter
         dl = self.dead_letter
+        if dl.enabled and self.health_check is None:
+            raise ValueError("health_check must be provided when dead_letter.enabled=True")
         if dl.max_size is not None and dl.max_size < 0:
             raise ValueError("dead_letter.max_size must be >= 0")
         if dl.retry_interval_seconds is not None and dl.retry_interval_seconds <= 0:

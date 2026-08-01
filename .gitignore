@@ -179,5 +179,11 @@ cache/
 
 testingoutsmth.py
 *.txt
+!scripts/omniproxy_files.txt
 *.json
 _*/
+outputs/
+
+# Pool flows (docs, slice lists, context-dump outputs under outputs/)
+docs/pool-flows/
+scripts/pool-flows/

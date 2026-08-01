@@ -9,6 +9,33 @@ if TYPE_CHECKING:
     from .config import CooldownConfig
 
 
+def coerce_exception_type(exception_type: object | None) -> type[BaseException] | None:
+    """Normalize a failure ``exc`` argument to an exception class.
+
+    Accepts ``None``, an exception class, or an exception instance. Any other
+    value returns ``None`` so callers can skip penalty matching without
+    raising :class:`TypeError` from :func:`issubclass`.
+
+    Args:
+        exception_type (object | None): Value passed as ``exc`` to
+            :meth:`~omniproxy.pool.AsyncProxyPool.mark_failed` or as
+            ``exception_type`` to :func:`compute_cooldown`.
+
+    Returns:
+        type[BaseException] | None: A usable exception class, or ``None``.
+
+    Version:
+        Added in 4.0.0.
+    """
+    if exception_type is None:
+        return None
+    if isinstance(exception_type, type) and issubclass(exception_type, BaseException):
+        return exception_type
+    if isinstance(exception_type, BaseException):
+        return type(exception_type)
+    return None
+
+
 def compute_cooldown(
     base: float,
     adaptive: bool,
@@ -34,7 +61,8 @@ def compute_cooldown(
             type to extra seconds added when ``exception_type`` matches.
             The first matching key in iteration order wins.
         exception_type (type[BaseException] | None): Exception class that
-            caused the failure. Used as the key in ``penalties``.
+            caused the failure. Used as the key in ``penalties``. Invalid
+            values are ignored (no penalty applied).
         _min (float): Lower clamp; defaults to ``30.0``.
         _max (float): Upper clamp; defaults to ``600.0``.
 
@@ -50,9 +78,12 @@ def compute_cooldown(
     else:
         duration: float | int = base
 
-    if exception_type is not None:
+    matched = coerce_exception_type(exception_type)
+    if matched is not None:
         for exc, penalty in penalties.items():
-            if issubclass(exception_type, exc):
+            if not (isinstance(exc, type) and issubclass(exc, BaseException)):
+                continue
+            if issubclass(matched, exc):
                 duration += penalty
                 break
 
@@ -90,4 +121,4 @@ def is_in_cooldown(proxy_id: str, cooldown_until: dict[str, float], now: float |
     return True
 
 
-__all__: list[str] = ["compute_cooldown", "is_in_cooldown"]
+__all__: list[str] = ["coerce_exception_type", "compute_cooldown", "is_in_cooldown"]

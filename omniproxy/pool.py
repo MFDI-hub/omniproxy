@@ -7,12 +7,18 @@ import logging
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import TYPE_CHECKING, Any
 
 from .config import PoolConfig
 from .constants import ANONYMITY_RANKS
-from .enum import FilterMissingMetadata, PoolStrategy, SessionCooldownPolicy, WarmupFailurePolicy
+from .enum import (
+    DeadLetterPersistence,
+    FilterMissingMetadata,
+    PoolStrategy,
+    SessionCooldownPolicy,
+    WarmupFailurePolicy,
+)
 from .errors import (
     MissingProxyMetadata,
     NoMatchingProxy,
@@ -25,7 +31,7 @@ from .errors import (
     WarmupFailedError,
 )
 from .extended_proxy import Proxy
-from .cooldown import compute_cooldown, is_in_cooldown
+from .cooldown import coerce_exception_type, compute_cooldown, is_in_cooldown
 from .circuit_breaker import CircuitBreaker, CircuitBreakerState
 from .scoring import EMAState, update_ema
 from .session import SessionEntry, resolve_session
@@ -107,13 +113,18 @@ class AcquireOptions:
         return cls(**merged)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class PoolStatistics:
-    """Simple monotonic counters for pool observability.
+    """Immutable monotonic counters for pool observability.
+
+    Instances returned by :attr:`AsyncProxyPool.statistics` are frozen
+    snapshots; mutating them raises :exc:`dataclasses.FrozenInstanceError`.
 
     Attributes:
         served (int): Number of proxies handed out by ``acquire``.
-        failed (int): Number of acquisitions that ended in failure.
+        failed (int): Number of client-reported acquisition failures
+            via :meth:`AsyncProxyPool.mark_failed`. Background health-check
+            failures do **not** increment this counter.
         released (int): Number of proxies returned via ``release``.
         exhausted_count (int): Number of times ``acquire`` raised
             :exc:`PoolExhausted` or a related error.
@@ -147,8 +158,8 @@ class AsyncProxyPool:
     use :class:`SyncProxyPool` to bridge into synchronous code.
 
     Attributes:
-        statistics (PoolStatistics): Live observability counters (read-only
-            via property).
+        statistics (PoolStatistics): Frozen observability counter snapshot
+            (re-read the property for updated values).
 
     Version:
         Added in 4.0.0.
@@ -178,6 +189,7 @@ class AsyncProxyPool:
         self._available_cond = asyncio.Condition(self._state_lock)
         self._refresh_lock = asyncio.Lock()
         self._close_lock = asyncio.Lock()
+        self._start_lock = asyncio.Lock()
         self._ready = asyncio.Event()
         self._draining = asyncio.Event()
         self._closed = False
@@ -189,7 +201,17 @@ class AsyncProxyPool:
         self._consecutive_failures: dict[str, int] = {}
         self._token_buckets: dict[str, Any] = {}
         self._session_registry: dict[str, SessionEntry] = {}
+        self._dead_letter_store: Any | None = None
         self._dead_letter_queue: list[Any] = []
+        if config.dead_letter.enabled:
+            if (
+                config.dead_letter.persistence == DeadLetterPersistence.STATE_STORE
+                and config.state_store_factory is not None
+            ):
+                from .dead_letter import load_queue
+
+                self._dead_letter_store = config.state_store_factory()
+                self._dead_letter_queue = load_queue(self._dead_letter_store)
         self._circuit_breaker = (
             CircuitBreaker(config.circuit_breaker) if config.circuit_breaker else None
         )
@@ -253,12 +275,69 @@ class AsyncProxyPool:
         """
         await self._close()
 
+    def _track_background_task(self, task: asyncio.Task) -> asyncio.Task:
+        """Register a background task for cancellation on shutdown.
+
+        Args:
+            task (asyncio.Task): Newly created worker task.
+
+        Returns:
+            asyncio.Task: The same task, tracked in ``_background_tasks``.
+
+        Version:
+            Added in 4.0.0.
+        """
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
+    def _spawn_background_tasks(self) -> None:
+        """Create configured background workers and track them for cleanup.
+
+        Health, dead-letter, and refresh workers wait on ``_ready`` before
+        mutating pool state so they do not race warmup. Metrics may drain
+        immediately.
+
+        Returns:
+            None
+
+        Version:
+            Added in 4.0.0.
+        """
+        if self._config.health_check:
+            self._bg_health = self._track_background_task(
+                asyncio.create_task(self._health_check_loop())
+            )
+        self._bg_dead = (
+            self._track_background_task(asyncio.create_task(self._dead_letter_retrier()))
+            if self._config.dead_letter.enabled
+            else None
+        )
+        has_refresh = (
+            self._fetchers
+            or self._config.refresh.async_callback
+            or self._config.refresh.sync_callback
+            or self._config.refresh.fallback_async_callbacks
+            or self._config.refresh.fallback_sync_callbacks
+        )
+        self._bg_refresh = (
+            self._track_background_task(asyncio.create_task(self._refresh_loop()))
+            if has_refresh
+            else None
+        )
+        self._bg_metrics = (
+            self._track_background_task(asyncio.create_task(self._metrics_worker()))
+            if self._config.metrics_exporter
+            else None
+        )
+
     async def _start(self) -> None:
         """Spawn background workers and run optional warmup.
 
         Called by :meth:`__aenter__`. Idempotent: a second call after the
-        pool is ready is a no-op. Any failure during startup triggers a
-        clean shutdown and re-raises.
+        pool is ready is a no-op. Serialized with concurrent ``close()`` via
+        ``_close_lock`` so a mid-start shutdown cannot leave orphan workers.
+        Any failure during startup triggers a clean shutdown and re-raises.
 
         Returns:
             None
@@ -271,69 +350,60 @@ class AsyncProxyPool:
         Version:
             Added in 4.0.0.
         """
-        if self._closed:
-            raise PoolClosedError("Pool is closed")
-        if self._ready.is_set():
-            return
-        await self._stop_background_tasks()
-        try:
-            if self._config.health_check:
-                self._bg_health = asyncio.create_task(self._health_check_loop())
-            self._bg_dead = (
-                asyncio.create_task(self._dead_letter_retrier())
-                if self._config.dead_letter.enabled
-                else None
-            )
-            has_refresh = (
-                self._fetchers
-                or self._config.refresh.async_callback
-                or self._config.refresh.sync_callback
-                or self._config.refresh.fallback_async_callbacks
-                or self._config.refresh.fallback_sync_callbacks
-            )
-            self._bg_refresh = (
-                asyncio.create_task(self._refresh_loop()) if has_refresh else None
-            )
-            self._bg_metrics = (
-                asyncio.create_task(self._metrics_worker())
-                if self._config.metrics_exporter
-                else None
-            )
+        async with self._start_lock:
+            try:
+                async with self._close_lock:
+                    if self._closed:
+                        raise PoolClosedError("Pool is closed")
+                    if self._ready.is_set():
+                        return
+                    await self._stop_background_tasks()
+                    self._spawn_background_tasks()
 
-            if self._config.warmup.enabled:
-                from .warmup import run_warmup
-                from .extended_proxy import arun_health_check
+                if self._config.warmup.enabled:
+                    from .warmup import run_warmup
+                    from .extended_proxy import arun_health_check
 
-                warmup_hooks: list[tuple[str, tuple]] = []
-                if self._config.hooks.on_warmup_started:
-                    warmup_hooks.append(("on_warmup_started", ()))
-                await run_deferred(warmup_hooks, self._config.hooks)
+                    warmup_hooks: list[tuple[str, tuple]] = []
+                    if self._config.hooks.on_warmup_started:
+                        warmup_hooks.append(("on_warmup_started", ()))
+                    await run_deferred(warmup_hooks, self._config.hooks)
 
-                ok, ready_count = await run_warmup(
-                    self, self._config.warmup, arun_health_check
-                )
-                if self._config.hooks.on_warmup_completed:
-                    await run_deferred(
-                        [
-                            (
-                                "on_warmup_completed",
-                                (ready_count, self._config.warmup.min_ready),
-                            )
-                        ],
-                        self._config.hooks,
+                    ok, ready_count = await run_warmup(
+                        self, self._config.warmup, arun_health_check
                     )
-                if not ok and self._config.warmup.failure_policy == WarmupFailurePolicy.RAISE:
-                    raise WarmupFailedError(
-                        f"Warmup failed: fewer than {self._config.warmup.min_ready} "
-                        f"proxies ready within {self._config.warmup.timeout}s"
-                    )
-            self._ready.set()
-        except Exception:
-            await self._close()
-            raise
+                    if self._config.hooks.on_warmup_completed:
+                        await run_deferred(
+                            [
+                                (
+                                    "on_warmup_completed",
+                                    (ready_count, self._config.warmup.min_ready),
+                                )
+                            ],
+                            self._config.hooks,
+                        )
+                    if (
+                        not ok
+                        and self._config.warmup.failure_policy == WarmupFailurePolicy.RAISE
+                    ):
+                        raise WarmupFailedError(
+                            f"Warmup failed: fewer than {self._config.warmup.min_ready} "
+                            f"proxies ready within {self._config.warmup.timeout}s"
+                        )
+
+                async with self._close_lock:
+                    if self._closed:
+                        raise PoolClosedError("Pool is closed")
+                    self._ready.set()
+            except BaseException:
+                await self._close()
+                raise
 
     async def _stop_background_tasks(self) -> None:
         """Cancel and await all background tasks (health, refresh, metrics).
+
+        Cancels every task in ``_background_tasks`` plus the named
+        ``_bg_*`` handles, then clears those references.
 
         Returns:
             None
@@ -341,11 +411,12 @@ class AsyncProxyPool:
         Version:
             Added in 4.0.0.
         """
-        tasks = [
-            t
-            for t in [self._bg_health, self._bg_dead, self._bg_refresh, self._bg_metrics]
-            if t is not None and not t.done()
-        ]
+        tasks: set[asyncio.Task] = {
+            t for t in self._background_tasks if not t.done()
+        }
+        for t in (self._bg_health, self._bg_dead, self._bg_refresh, self._bg_metrics):
+            if t is not None and not t.done():
+                tasks.add(t)
         for task in tasks:
             task.cancel()
         for task in tasks:
@@ -353,6 +424,7 @@ class AsyncProxyPool:
                 await task
             except asyncio.CancelledError:
                 pass
+        self._background_tasks.clear()
         self._bg_health = None
         self._bg_dead = None
         self._bg_refresh = None
@@ -363,6 +435,8 @@ class AsyncProxyPool:
 
         Sets the draining flag, waits up to ``config.drain_timeout`` for
         outstanding acquisitions to return, then cancels background tasks.
+        If the pool never became ready (e.g. close during warmup), ``_ready``
+        is set after ``_closed`` so waiters on startup can observe the close.
         Idempotent.
 
         Returns:
@@ -402,6 +476,10 @@ class AsyncProxyPool:
                             break
 
             self._closed = True
+            # Unblock acquirers / workers still waiting on startup so they
+            # can observe ``_closed`` and exit (or raise PoolClosedError).
+            if not self._ready.is_set():
+                self._ready.set()
             async with self._state_lock:
                 self._pending_session_rebind.clear()
                 self._available_cond.notify_all()
@@ -546,7 +624,9 @@ class AsyncProxyPool:
             return
         self._connections[proxy.url] = current - 1
         if count_release_stat:
-            self._statistics.released += 1
+            self._statistics = replace(
+                self._statistics, released=self._statistics.released + 1
+            )
         self._available_cond.notify_all()
 
     async def acquire(self, **filters: Any) -> Proxy:
@@ -584,7 +664,6 @@ class AsyncProxyPool:
         """
         await self._ready.wait()
         options = AcquireOptions.from_kwargs(self._config, **filters)
-        deferred: list[tuple[str, tuple]] = []
         loop = asyncio.get_running_loop()
         timeout = self._config.acquire_timeout
         start_time = loop.time()
@@ -592,6 +671,7 @@ class AsyncProxyPool:
         did_on_demand_refresh = False
 
         while True:
+            deferred: list[tuple[str, tuple]] = []
             should_refresh = False
             circuit_open = False
             circuit_exc: PoolCircuitOpenError | None = None
@@ -656,7 +736,10 @@ class AsyncProxyPool:
                     continue
 
             async with self._state_lock:
-                self._statistics.exhausted_count += 1
+                self._statistics = replace(
+                    self._statistics,
+                    exhausted_count=self._statistics.exhausted_count + 1,
+                )
                 self._emit_stat_metric("pool.exhausted", float(self._statistics.exhausted_count))
                 exc = self._classify_acquire_failure(options)
                 if isinstance(exc, PoolSaturated) and self._config.hooks.on_saturated:
@@ -665,10 +748,21 @@ class AsyncProxyPool:
             await run_deferred(deferred, self._config.hooks)
             raise exc
 
-        if self._config.rotate_on_acquire and proxy.rotation_url:
-            await proxy.arotate()
-        await run_deferred(deferred, self._config.hooks)
-        return proxy
+        # Lease is held from here; any failure before returning to the caller
+        # must release it or the connection counter will leak.
+        try:
+            if self._config.rotate_on_acquire and proxy.rotation_url:
+                await proxy.arotate()
+            await run_deferred(deferred, self._config.hooks)
+            return proxy
+        except Exception:
+            async with self._state_lock:
+                self._return_lease(proxy, count_release_stat=False)
+                if self._half_open_probe_proxy is proxy:
+                    self._half_open_probe_epoch = None
+                    self._half_open_probe_url = None
+                    self._half_open_probe_proxy = None
+            raise
 
     async def release(self, proxy: Proxy) -> None:
         """Return a proxy to the pool after a successful use.
@@ -705,8 +799,9 @@ class AsyncProxyPool:
 
         Args:
             proxy (Proxy): Proxy that failed.
-            exc (type | None): Exception class that caused the failure;
-                used for per-type cooldown penalties.
+            exc (type | None): Exception class (or instance) that caused
+                the failure; used for per-type cooldown penalties. Non-exception
+                values are ignored with a warning so failure hooks still fire.
 
         Returns:
             None
@@ -716,13 +811,21 @@ class AsyncProxyPool:
         """
         deferred: list[tuple[str, tuple]] = []
         rotate = False
+        exc_type = coerce_exception_type(exc)
+        if exc is not None and exc_type is None:
+            logger.warning(
+                "mark_failed exc must be an exception class or instance, got %r; ignoring",
+                exc,
+            )
         async with self._state_lock:
-            probe_epoch = self._half_open_probe_epoch
+            is_probe = self._half_open_probe_proxy is proxy
+            probe_epoch = self._half_open_probe_epoch if is_probe else None
             self._return_lease(proxy, count_release_stat=False)
-            self._half_open_probe_epoch = None
-            self._half_open_probe_url = None
-            self._half_open_probe_proxy = None
-            self._statistics.failed += 1
+            if is_probe:
+                self._half_open_probe_epoch = None
+                self._half_open_probe_url = None
+                self._half_open_probe_proxy = None
+            self._statistics = replace(self._statistics, failed=self._statistics.failed + 1)
             self._emit_stat_metric("pool.failed", float(self._statistics.failed))
             self._consecutive_failures[proxy.url] = self._consecutive_failures.get(proxy.url, 0) + 1
             state = self._scores.get(proxy.url)
@@ -736,16 +839,19 @@ class AsyncProxyPool:
                     latency=None,
                     decay=self._config.scoring.decay_factor,
                 )
-            self._apply_cooldown(proxy, exc, deferred)
+            self._apply_cooldown(proxy, exc_type, deferred)
             if self._circuit_breaker:
                 self._circuit_breaker.record_failure(probe_epoch=probe_epoch)
                 self._append_circuit_hooks(deferred)
             rotate = self._config.rotate_on_failure and bool(proxy.rotation_url)
-            deferred.append(("on_proxy_failed", (proxy, exc)))
+            deferred.append(("on_proxy_failed", (proxy, exc_type)))
 
-        if rotate:
-            await proxy.arotate()
-        await run_deferred(deferred, self._config.hooks)
+        # Rotation is best-effort I/O; failure lifecycle hooks must still fire.
+        try:
+            if rotate:
+                await proxy.arotate()
+        finally:
+            await run_deferred(deferred, self._config.hooks)
 
     async def mark_success(self, proxy: Proxy, latency: float | None = None) -> None:
         """Report that ``proxy`` succeeded for the current acquisition.
@@ -767,11 +873,13 @@ class AsyncProxyPool:
         """
         deferred: list[tuple[str, tuple]] = []
         async with self._state_lock:
-            probe_epoch = self._half_open_probe_epoch
+            is_probe = self._half_open_probe_proxy is proxy
+            probe_epoch = self._half_open_probe_epoch if is_probe else None
             self._return_lease(proxy, count_release_stat=False)
-            self._half_open_probe_epoch = None
-            self._half_open_probe_url = None
-            self._half_open_probe_proxy = None
+            if is_probe:
+                self._half_open_probe_epoch = None
+                self._half_open_probe_url = None
+                self._half_open_probe_proxy = None
             self._consecutive_failures.pop(proxy.url, None)
             state = self._scores.get(proxy.url)
             if state is None and self._config.scoring:
@@ -1096,6 +1204,11 @@ class AsyncProxyPool:
             Added in 4.0.0.
         """
         now = time.monotonic()
+        # Sticky REBIND: defer registry drop / pending_rebind until a
+        # replacement is actually eligible. Setting them when no alternative
+        # exists leaves a stale pending entry and an unbound session that can
+        # block subsequent acquires from re-evaluating the original binding.
+        rebind_from: Proxy | None = None
 
         if options.session_key:
             bound = resolve_session(
@@ -1115,8 +1228,7 @@ class AsyncProxyPool:
                         raise SessionBrokenError(
                             f"Session '{options.session_key}' proxy is unavailable (cooldown)"
                         )
-                    self._pending_session_rebind[options.session_key] = bound
-                    self._session_registry.pop(options.session_key, None)
+                    rebind_from = bound
                 else:
                     if self._at_connection_cap(bound):
                         return []
@@ -1126,6 +1238,8 @@ class AsyncProxyPool:
 
         result: list[Proxy] = []
         for proxy in self._proxies:
+            if rebind_from is not None and proxy.url == rebind_from.url:
+                continue
             if is_in_cooldown(proxy.url, self._cooldown_until, now):
                 continue
             if self._at_connection_cap(proxy):
@@ -1133,6 +1247,16 @@ class AsyncProxyPool:
             if not self._sticky_filters_ok(proxy, options):
                 continue
             result.append(proxy)
+
+        if options.session_key:
+            if rebind_from is not None and result:
+                self._pending_session_rebind[options.session_key] = rebind_from
+                self._session_registry.pop(options.session_key, None)
+            elif not result:
+                # Selection failed — drop stale pending so the next attempt
+                # re-evaluates the binding from scratch.
+                self._pending_session_rebind.pop(options.session_key, None)
+
         return result
 
     def _mark_acquired(self, proxy: Proxy, session_key: str | None = None) -> None:
@@ -1149,7 +1273,7 @@ class AsyncProxyPool:
             Added in 4.0.0.
         """
         self._connections[proxy.url] = self._connections.get(proxy.url, 0) + 1
-        self._statistics.served += 1
+        self._statistics = replace(self._statistics, served=self._statistics.served + 1)
         self._emit_stat_metric("pool.served", float(self._statistics.served))
         if (
             self._circuit_breaker
@@ -1184,7 +1308,8 @@ class AsyncProxyPool:
         Args:
             proxy (Proxy): Proxy to cool down.
             exc (type | None): Exception class that caused the failure
-                (looked up in cooldown penalties).
+                (looked up in cooldown penalties). Non-exception values are
+                ignored.
             deferred (list[tuple[str, tuple]] | None): Optional hook
                 buffer; receives an ``on_proxy_cooled_down`` entry when the
                 hook is configured.
@@ -1200,6 +1325,7 @@ class AsyncProxyPool:
         if failures < cfg.failure_threshold:
             return
         total_proxies = len(self._proxies)
+        exc_type = coerce_exception_type(exc)
         if cfg.strategy is not None:
             raw = cfg.strategy(float(cfg.base), int(failures), int(total_proxies))
             dur = max(cfg.min, min(cfg.max, float(raw)))
@@ -1209,7 +1335,7 @@ class AsyncProxyPool:
                 cfg.adaptive,
                 failures,
                 cfg.penalties,
-                exc,
+                exc_type,
                 _min=cfg.min,
                 _max=cfg.max,
             )
@@ -1256,7 +1382,8 @@ class AsyncProxyPool:
                 deferred.append(("on_check_complete", (proxy, result)))
             deferred.append(("on_proxy_recovered", (proxy,)))
         else:
-            self._statistics.failed += 1
+            # Health-check failures must not pollute PoolStatistics.failed /
+            # pool.failed (those track client mark_failed only).
             self._consecutive_failures[proxy.url] = self._consecutive_failures.get(proxy.url, 0) + 1
             if self._config.scoring:
                 state = self._scores.get(proxy.url)
@@ -1289,16 +1416,26 @@ class AsyncProxyPool:
         """
         return max(1, self._consecutive_failures.get(proxy.url, 0))
 
-    def _evict_proxy(self, url: str, deferred: list[tuple[str, tuple]] | None = None) -> None:
+    def _evict_proxy(
+        self,
+        proxy: Proxy,
+        deferred: list[tuple[str, tuple]] | None = None,
+        *,
+        reason: str = "max_size",
+    ) -> None:
         """Remove all bookkeeping for a proxy from the pool.
 
         Cleans up scoring, cooldown, connection counts, token buckets, and
-        sticky-session entries pointing at the proxy.
+        sticky-session entries pointing at the proxy. When dead-letter is
+        enabled, enqueues the proxy for later retry (caller must hold
+        ``_state_lock``).
 
         Args:
-            url (str): Canonical URL of the proxy to evict.
+            proxy (Proxy): Proxy that was removed from ``_proxies``.
             deferred (list[tuple[str, tuple]] | None): Optional hook buffer
-                that gets an ``on_auto_evicted`` entry when the hook is set.
+                for ``on_auto_evicted`` / ``on_dead_letter_added``.
+            reason (str): Eviction reason string passed to hooks and stored
+                on the dead-letter entry.
 
         Returns:
             None
@@ -1306,7 +1443,7 @@ class AsyncProxyPool:
         Version:
             Added in 4.0.0.
         """
-        evicted_proxy = next((p for p in self._proxies if p.url == url), None)
+        url = proxy.url
         self._scores.pop(url, None)
         self._cooldown_until.pop(url, None)
         self._connections.pop(url, None)
@@ -1318,12 +1455,23 @@ class AsyncProxyPool:
         stale_rebind = [k for k, bound in self._pending_session_rebind.items() if bound.url == url]
         for key in stale_rebind:
             self._pending_session_rebind.pop(key, None)
-        if (
-            deferred is not None
-            and evicted_proxy is not None
-            and self._config.hooks.on_auto_evicted
-        ):
-            deferred.append(("on_auto_evicted", (evicted_proxy, "max_size")))
+        if self._config.dead_letter.enabled:
+            from .dead_letter import DeadLetterEntry, maybe_add, persist_queue
+
+            maybe_add(
+                DeadLetterEntry(proxy=proxy, error=reason, timestamp=time.monotonic()),
+                self._config.dead_letter,
+                self._dead_letter_queue,
+            )
+            persist_queue(
+                self._dead_letter_queue,
+                self._config.dead_letter,
+                self._dead_letter_store,
+            )
+            if deferred is not None and self._config.hooks.on_dead_letter_added:
+                deferred.append(("on_dead_letter_added", (proxy, reason)))
+        if deferred is not None and self._config.hooks.on_auto_evicted:
+            deferred.append(("on_auto_evicted", (proxy, reason)))
 
     async def _attempt_on_demand_refresh(self, options: AcquireOptions) -> bool:
         """Run a single refresh cycle under the refresh lock.
@@ -1368,7 +1516,10 @@ class AsyncProxyPool:
         ):
             return await fetch_from_refresh_config(refresh)
         if self._fetchers:
-            return await fetch_from_fetchers(self._fetchers)
+            return await fetch_from_fetchers(
+                self._fetchers,
+                timeout=refresh.timeout,
+            )
         return []
 
     async def _refresh_and_merge(self) -> int:
@@ -1439,7 +1590,7 @@ class AsyncProxyPool:
         if self._config.max_size and len(self._proxies) > self._config.max_size:
             while len(self._proxies) > self._config.max_size:
                 evicted = self._proxies.popleft()
-                self._evict_proxy(evicted.url, evict_deferred)
+                self._evict_proxy(evicted, evict_deferred, reason="max_size")
         self._check_min_size()
         return added, evict_deferred
 
@@ -1490,7 +1641,9 @@ class AsyncProxyPool:
         Sleeps for ``health_check.check_interval`` (default 60s) between
         cycles. Each cycle gathers the in-flight proxies, runs them through
         the configured health check bounded by ``self._health_sem``, and
-        applies results under the state lock.
+        applies results under the state lock. Per-cycle and per-result
+        failures are logged and swallowed so one bad proxy or apply error
+        cannot terminate the loop.
 
         Returns:
             None
@@ -1503,35 +1656,50 @@ class AsyncProxyPool:
         hc = self._config.health_check
         assert hc is not None
         interval = hc.check_interval if hc.check_interval is not None else 60.0
+        await self._ready.wait()
         while not self._closed:
             await asyncio.sleep(interval)
-            now = time.monotonic()
-            async with self._state_lock:
-                candidates = [
-                    p for p in self._proxies if not is_in_cooldown(p.url, self._cooldown_until, now)
-                ]
-            if not candidates:
-                continue
+            if self._closed:
+                break
+            try:
+                now = time.monotonic()
+                async with self._state_lock:
+                    candidates = [
+                        p
+                        for p in self._proxies
+                        if not is_in_cooldown(p.url, self._cooldown_until, now)
+                    ]
+                if not candidates:
+                    continue
 
-            sem = self._health_sem
+                sem = self._health_sem
 
-            async def bounded_check(p: Proxy):
-                async with sem:
-                    return await arun_health_check(p, hc)
+                async def bounded_check(p: Proxy):
+                    async with sem:
+                        # arun_health_check returns (Proxy, CheckResult)
+                        return await arun_health_check(p, hc)
 
-            results = await asyncio.gather(
-                *(bounded_check(p) for p in candidates),
-                return_exceptions=True,
-            )
-            deferred: list[tuple[str, tuple]] = []
-            async with self._state_lock:
-                for item in results:
-                    if isinstance(item, BaseException):
-                        logger.warning("Health check task failed: %s", item)
-                        continue
-                    proxy, check_result = item
-                    self._apply_check_result(proxy, check_result, deferred)
-            await run_deferred(deferred, self._config.hooks)
+                results = await asyncio.gather(
+                    *(bounded_check(p) for p in candidates),
+                    return_exceptions=True,
+                )
+                deferred: list[tuple[str, tuple]] = []
+                async with self._state_lock:
+                    for item in results:
+                        if isinstance(item, BaseException):
+                            logger.warning("Health check task failed: %s", item)
+                            continue
+                        proxy, check_result = item
+                        try:
+                            self._apply_check_result(proxy, check_result, deferred)
+                        except Exception:
+                            logger.exception(
+                                "Failed to apply health-check result for %s",
+                                getattr(proxy, "url", proxy),
+                            )
+                await run_deferred(deferred, self._config.hooks)
+            except Exception:
+                logger.exception("Health check cycle failed")
 
     async def _dead_letter_retrier(self) -> None:
         """Background coroutine: periodically retry dead-letter entries.
@@ -1545,6 +1713,9 @@ class AsyncProxyPool:
         from .dead_letter import retry_cycle
         from .extended_proxy import arun_health_check
 
+        await self._ready.wait()
+        if self._closed:
+            return
         await retry_cycle(
             self,
             self._dead_letter_queue,
@@ -1563,6 +1734,7 @@ class AsyncProxyPool:
             Added in 4.0.0.
         """
         interval = self._config.refresh.interval_seconds
+        await self._ready.wait()
         while not self._closed:
             async with self._state_lock:
                 urgent = self._refresh_needed
@@ -1570,6 +1742,8 @@ class AsyncProxyPool:
                     self._refresh_needed = False
             if not urgent:
                 await asyncio.sleep(interval)
+            if self._closed:
+                break
             async with self._state_lock:
                 pool_size = len(self._proxies)
                 below_min = (
@@ -1583,7 +1757,10 @@ class AsyncProxyPool:
                     self._config.min_size,
                 )
             async with self._refresh_lock:
-                await self._refresh_and_merge()
+                try:
+                    await self._refresh_and_merge()
+                except Exception:
+                    logger.exception("Background refresh cycle failed")
 
     async def _metrics_worker(self) -> None:
         """Background coroutine: drain queued metrics into the exporter.
@@ -1649,10 +1826,13 @@ class AsyncProxyPool:
 
     @property
     def statistics(self) -> PoolStatistics:
-        """Read-only access to the live :class:`PoolStatistics` instance.
+        """Frozen snapshot of pool observability counters.
+
+        Returns a :class:`PoolStatistics` instance that cannot be mutated.
+        Callers that need a later reading should re-read this property.
 
         Returns:
-            PoolStatistics: Counters maintained by the pool.
+            PoolStatistics: Immutable counter snapshot.
 
         Version:
             Added in 4.0.0.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from omniproxy.fetchers.file_fetcher import FileFetcher
 from omniproxy.fetchers.scrape_fetcher import ScrapeFetcher
@@ -89,9 +91,25 @@ class _StaticFetcher:
         return list(self.seq)
 
 
+class _HangingFetcher:
+    async def fetch(self) -> list[str]:
+        await asyncio.sleep(3600)
+        return []
+
+
 @pytest.mark.asyncio
 async def test_fetch_from_fetchers_deduplicates_urls() -> None:
     proxies = await fetch_from_fetchers(
         [_StaticFetcher(["127.0.0.5:9050"]), _StaticFetcher(["127.0.0.5:9050"])]
     )
     assert len(proxies) == 1
+
+
+@pytest.mark.asyncio
+async def test_fetch_from_fetchers_times_out_hung_fetcher() -> None:
+    proxies = await fetch_from_fetchers(
+        [_HangingFetcher(), _StaticFetcher(["127.0.0.5:9050"])],
+        timeout=0.05,
+    )
+    assert len(proxies) == 1
+    assert "127.0.0.5" in proxies[0].url

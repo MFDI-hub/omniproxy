@@ -6,8 +6,6 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from .enum import WarmupFailurePolicy
-
 if TYPE_CHECKING:
     from .pool import AsyncProxyPool
     from .config import WarmupConfig
@@ -55,8 +53,13 @@ async def run_warmup(
 
     Repeatedly takes unchecked candidates from the pool, runs the supplied
     ``health_check_fn`` against each (bounded by the pool's health semaphore),
-    and records successes. The loop exits when enough proxies are ready, when
-    the configured timeout elapses, or when there are no candidates left.
+    and records successes. Each probe batch is bounded by the remaining
+    warmup deadline; unfinished checks are cancelled so they cannot mutate
+    pool state after the deadline.
+
+    Never raises on failure: always returns ``(False, ready_count)`` when
+    ``min_ready`` is unmet so the caller can fire ``on_warmup_completed``
+    before applying :attr:`~omniproxy.config.WarmupConfig.failure_policy`.
 
     Args:
         pool (AsyncProxyPool): Async pool being warmed.
@@ -68,17 +71,11 @@ async def run_warmup(
         tuple[bool, int]: ``(success, ready_count)`` where ``success`` is
         ``True`` only when ``ready_count >= config.min_ready``.
 
-    Raises:
-        WarmupFailedError: When the timeout elapses and
-            ``config.failure_policy`` is :attr:`WarmupFailurePolicy.RAISE`.
-
     Version:
         Added in 4.0.0.
     """
     if not config.enabled:
         return True, 0
-
-    from .errors import WarmupFailedError
 
     loop = asyncio.get_running_loop()
     deadline = loop.time() + config.timeout
@@ -90,12 +87,8 @@ async def run_warmup(
             return await health_check_fn(proxy, pool._config.health_check)
 
     while len(ready_urls) < config.min_ready:
-        if loop.time() > deadline:
-            if config.failure_policy == WarmupFailurePolicy.RAISE:
-                raise WarmupFailedError(
-                    f"Warmup failed: {len(ready_urls)}/{config.min_ready} ready after "
-                    f"{config.timeout}s"
-                )
+        remaining = deadline - loop.time()
+        if remaining <= 0:
             return False, len(ready_urls)
 
         candidates = await pool._unchecked_proxies()
@@ -103,17 +96,21 @@ async def run_warmup(
         if not candidates:
             break
 
-        results = await asyncio.gather(
-            *(check_one(p) for p in candidates),
-            return_exceptions=True,
-        )
+        tasks = [asyncio.create_task(check_one(p)) for p in candidates]
+        done, pending = await asyncio.wait(tasks, timeout=remaining)
+        timed_out = bool(pending)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
 
-        for item in results:
-            if loop.time() > deadline:
-                break
-            if isinstance(item, BaseException):
+        for task in done:
+            if task.cancelled():
                 continue
-            proxy, result = item
+            exc = task.exception()
+            if exc is not None:
+                continue
+            proxy, result = task.result()
             applied = False
             if result.success:
                 applied = await pool._record_health_check_result(proxy, result)
@@ -122,8 +119,12 @@ async def run_warmup(
                 if len(ready_urls) >= config.min_ready:
                     return True, len(ready_urls)
 
-        if loop.time() <= deadline:
-            await asyncio.sleep(_POLL_INTERVAL)
+        if timed_out or loop.time() >= deadline:
+            return False, len(ready_urls)
+
+        sleep_for = min(_POLL_INTERVAL, deadline - loop.time())
+        if sleep_for > 0:
+            await asyncio.sleep(sleep_for)
 
     ready = len(ready_urls) >= config.min_ready
     return ready, len(ready_urls)
