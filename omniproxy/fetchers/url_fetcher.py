@@ -187,6 +187,33 @@ def _extract_strings_from_json(data: Any) -> list[str]:
     return out
 
 
+def _apply_protocol_prefix(lines: list[str], protocol: str | None) -> list[str]:
+    """Prefix bare ``host:port`` lines with ``protocol://`` when configured.
+
+    Lines that already contain a URL scheme are returned unchanged.
+
+    Args:
+        lines (list[str]): Candidate proxy strings from the response body.
+        protocol (str | None): Scheme to apply when the line has no ``://``.
+
+    Returns:
+        list[str]: Possibly prefixed proxy strings.
+
+    Version:
+        Added in 4.0.1.
+    """
+    if not protocol:
+        return lines
+    p = protocol.lower()
+    out: list[str] = []
+    for line in lines:
+        if "://" in line:
+            out.append(line)
+        else:
+            out.append(f"{p}://{line}")
+    return out
+
+
 class URLFetcher:
     """Download a remote proxy list and return raw proxy strings.
 
@@ -199,12 +226,13 @@ class URLFetcher:
         _timeout (float | None): Per-request socket timeout.
         _fmt (UrlListFormat): Body interpretation policy.
         _encoding (str): Text encoding used for plain-text bodies.
+        _protocol (str | None): Default scheme for bare ``host:port`` lines.
 
     Version:
         Added in 4.0.0.
     """
 
-    __slots__ = ("_encoding", "_fmt", "_headers", "_timeout", "_url")
+    __slots__ = ("_encoding", "_fmt", "_headers", "_protocol", "_timeout", "_url")
 
     def __init__(
         self,
@@ -214,6 +242,7 @@ class URLFetcher:
         timeout: float | None = None,
         body_format: UrlListFormat = UrlListFormat.AUTO,
         text_encoding: str = "utf-8",
+        protocol: str | None = None,
     ) -> None:
         """Build a URL-backed fetcher.
 
@@ -224,6 +253,9 @@ class URLFetcher:
                 to ``settings.default_timeout``.
             body_format (UrlListFormat): Body interpretation policy.
             text_encoding (str): Decoding for plain-text bodies.
+            protocol (str | None): When set, bare ``host:port`` lines from
+                the response are prefixed with ``{protocol}://``. Lines that
+                already include a scheme are left unchanged.
 
         Version:
             Added in 4.0.0.
@@ -233,6 +265,7 @@ class URLFetcher:
         self._timeout = timeout
         self._fmt = body_format
         self._encoding = text_encoding
+        self._protocol = protocol.lower() if protocol else None
 
     async def fetch(self) -> list[str]:
         """Download and parse the proxy list.
@@ -252,4 +285,5 @@ class URLFetcher:
         except URLError:
             return []
 
-        return parse_proxy_urls_from_payload(body, text_encoding=self._encoding, fmt=self._fmt)
+        lines = parse_proxy_urls_from_payload(body, text_encoding=self._encoding, fmt=self._fmt)
+        return _apply_protocol_prefix(lines, self._protocol)

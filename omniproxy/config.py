@@ -327,6 +327,9 @@ class HealthCheckConfig(BaseModel):
         check_interval (float | None): Periodic check interval; ``None`` disables periodic checks.
         custom_check (Callable[[Proxy], bool] | None): Replace the HTTP check
             with a user-supplied callable.
+        max_concurrent_checks (int): Peak in-flight health/warmup probes.
+        max_latency (float | None): Fail the probe when measured latency
+            exceeds this many seconds. ``None`` skips the speed gate.
 
     Version:
         Added in 4.0.0.
@@ -342,6 +345,28 @@ class HealthCheckConfig(BaseModel):
     recovery_interval: float = 60.0
     check_interval: float | None = None
     custom_check: Callable[[Proxy], bool] | None = None
+    max_concurrent_checks: int = 50
+    max_latency: float | None = None
+
+    @model_validator(mode="after")
+    def _validate_health_check(self) -> HealthCheckConfig:
+        """Ensure concurrency and latency bounds are sane.
+
+        Returns:
+            HealthCheckConfig: The validated instance.
+
+        Raises:
+            ValueError: If ``max_concurrent_checks`` is below 1 or
+                ``max_latency`` is not positive.
+
+        Version:
+            Added in 4.0.1.
+        """
+        if self.max_concurrent_checks < 1:
+            raise ValueError("health_check.max_concurrent_checks must be >= 1")
+        if self.max_latency is not None and self.max_latency <= 0:
+            raise ValueError("health_check.max_latency must be > 0 when set")
+        return self
 
 class LimitsConfig(BaseModel):
     """Per-proxy concurrency and rate limits.
@@ -719,6 +744,8 @@ class PoolConfig(BaseModel):
         dedup_key (Callable[[Proxy], str] | None): Custom dedup key function.
         acquire_tags (set[str] | None): Restrict acquisitions to proxies
             carrying any of these tags.
+        max_latency (float | None): Default acquire-time ceiling for
+            ``proxy.latency`` in seconds. ``None`` disables the speed filter.
         use_rotation_urls (bool): Call the proxy's rotation URL on acquire.
         rotate_on_acquire (bool): Rotate the proxy on acquisition.
         rotate_on_failure (bool): Rotate the proxy after a failure.
@@ -768,6 +795,7 @@ class PoolConfig(BaseModel):
     reraise: bool = True
     dedup_key: Callable[[Proxy], str] | None = None
     acquire_tags: set[str] | None = None
+    max_latency: float | None = None
     use_rotation_urls: bool = False
     rotate_on_acquire: bool = False
     rotate_on_failure: bool = False
@@ -843,6 +871,8 @@ class PoolConfig(BaseModel):
             raise ValueError("max_size must be >= 0")
         if self.min_size is not None and self.max_size is not None and self.min_size > self.max_size:
             raise ValueError("min_size cannot exceed max_size")
+        if self.max_latency is not None and self.max_latency <= 0:
+            raise ValueError("max_latency must be > 0 when set")
 
         # dead letter
         dl = self.dead_letter

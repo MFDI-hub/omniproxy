@@ -188,10 +188,11 @@ class WeightedStrategy:
 
 
 class LowestLatencyStrategy:
-    """Always pick the proxy with the lowest EMA latency.
+    """Always pick the proxy with the lowest known latency.
 
-    Proxies without a latency sample yet are not considered "lowest" and
-    naturally lose to any proxy that has produced a latency measurement.
+    Prefer ``latency_ema`` when a score exists. Otherwise use the latency
+    written on the proxy by a health check. Proxies with neither lose to
+    any proxy that has a measurement.
 
     Version:
         Added in 4.0.0.
@@ -203,7 +204,7 @@ class LowestLatencyStrategy:
         scores: dict[str, EMAState],
         context: Any,
     ) -> Proxy | None:
-        """Pick the proxy with the smallest ``latency_ema``.
+        """Pick the proxy with the smallest known latency.
 
         Args:
             eligible (list[Proxy]): Candidate proxies.
@@ -220,14 +221,18 @@ class LowestLatencyStrategy:
         """
         if not eligible:
             return None
-        best: Proxy = eligible[0]
+        best: Proxy | None = None
         best_latency = float("inf")
         for p in eligible:
             state: EMAState | None = scores.get(p.url)
-            if state and state.latency_ema is not None and state.latency_ema < best_latency:
-                best_latency: int | float = state.latency_ema
-                best: Proxy = p
-        return best
+            if state is not None and state.latency_ema is not None:
+                latency: float | None = float(state.latency_ema)
+            else:
+                latency = p.latency
+            if latency is not None and latency < best_latency:
+                best_latency = latency
+                best = p
+        return best if best is not None else eligible[0]
 
 
 __all__: list[str] = [

@@ -104,6 +104,25 @@ class TestFiltering:
         pool.release(p)
         pool.close()
 
+    def test_max_latency_filter(self, s0, s1, minimal_round_robin_pool_config):
+        slow = proxy_with_meta(s0, latency=4.0)
+        fast = proxy_with_meta(s1, latency=0.4)
+        cfg = minimal_round_robin_pool_config.model_copy(update={"max_latency": 3.0})
+        pool = SyncProxyPool(cfg, [slow, fast])
+        p = pool.acquire()
+        assert p.url == fast.url
+        pool.release(p)
+        pool.close()
+
+    def test_max_latency_acquire_kwarg(self, s0, s1, minimal_round_robin_pool_config):
+        slow = proxy_with_meta(s0, latency=2.0)
+        fast = proxy_with_meta(s1, latency=0.2)
+        pool = SyncProxyPool(minimal_round_robin_pool_config, [slow, fast])
+        p = pool.acquire(max_latency=0.5)
+        assert p.url == fast.url
+        pool.release(p)
+        pool.close()
+
     def test_missing_metadata_skip(self, s0, s1, round_robin_skip_missing_metadata_pool_config):
         bare = Proxy(s0)
         tagged = proxy_with_meta(s1, country="US")

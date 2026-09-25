@@ -61,6 +61,8 @@ class AcquireOptions:
             proxy metadata.
         min_anonymity (str | None): Minimum anonymity tier
             (``transparent`` < ``anonymous`` < ``elite``).
+        max_latency (float | None): Maximum last-measured ``proxy.latency``
+            in seconds.
         session_key (str | None): Sticky-session identifier.
         accept_callback (Any): Optional predicate
             ``Callable[[Proxy], bool]`` for custom acceptance.
@@ -72,6 +74,7 @@ class AcquireOptions:
     tags: set[str] | None = None
     country: str | None = None
     min_anonymity: str | None = None
+    max_latency: float | None = None
     session_key: str | None = None
     accept_callback: Any = None
 
@@ -81,8 +84,8 @@ class AcquireOptions:
 
         Accepts both ``session_key`` and the legacy ``session_id`` alias.
         Unknown keys are logged at WARNING level and discarded. Pool-level
-        ``acquire_tags`` and ``accept_callback`` are inherited when the
-        caller does not override them.
+        ``acquire_tags``, ``max_latency`` and ``accept_callback`` are inherited
+        when the caller does not override them.
 
         Args:
             config (PoolConfig): Pool configuration providing defaults.
@@ -104,6 +107,11 @@ class AcquireOptions:
         merged = {k: v for k, v in filters.items() if k in known}
         if merged.get("tags") is None and config.acquire_tags is not None:
             merged["tags"] = config.acquire_tags
+        if merged.get("max_latency") is None:
+            if config.max_latency is not None:
+                merged["max_latency"] = config.max_latency
+            elif config.health_check is not None and config.health_check.max_latency is not None:
+                merged["max_latency"] = config.health_check.max_latency
         if merged.get("accept_callback") is None and config.accept_callback is not None:
             pool_cb = config.accept_callback
 
@@ -233,9 +241,7 @@ class AsyncProxyPool:
         self._refresh_generation = 0
 
         if config.health_check:
-            self._health_sem = asyncio.Semaphore(
-                getattr(config.health_check, "max_concurrent_checks", 50)
-            )
+            self._health_sem = asyncio.Semaphore(config.health_check.max_concurrent_checks)
         else:
             self._health_sem = asyncio.Semaphore(50)
 
@@ -638,8 +644,8 @@ class AsyncProxyPool:
         Args:
             **filters (Any): Acquire-time filters forwarded to
                 :meth:`AcquireOptions.from_kwargs`. Common keys include
-                ``tags``, ``country``, ``min_anonymity``, ``session_key``
-                and ``accept_callback``.
+                ``tags``, ``country``, ``min_anonymity``, ``max_latency``,
+                ``session_key`` and ``accept_callback``.
 
         Returns:
             Proxy: Acquired proxy.
@@ -1029,6 +1035,8 @@ class AsyncProxyPool:
             filters.append(("anonymity", options.min_anonymity))
         if options.tags:
             filters.append(("tags", options.tags))
+        if options.max_latency is not None:
+            filters.append(("latency", options.max_latency))
         return filters
 
     def _proxy_matches_metadata_filter(
@@ -1061,6 +1069,11 @@ class AsyncProxyPool:
             if self._metadata_value_missing(proxy, "tags"):
                 return ignore_missing
             return bool(filter_val & set(getattr(proxy, "tags", [])))
+        if attr == "latency":
+            if self._metadata_value_missing(proxy, "latency"):
+                return ignore_missing
+            latency = proxy.latency
+            return latency is not None and latency <= filter_val
         return False
 
     def _missing_metadata_message(self, options: AcquireOptions) -> str | None:
@@ -1111,7 +1124,13 @@ class AsyncProxyPool:
 
         now = time.monotonic()
         has_filters = any(
-            [options.tags, options.country, options.min_anonymity, options.accept_callback]
+            [
+                options.tags,
+                options.country,
+                options.min_anonymity,
+                options.max_latency,
+                options.accept_callback,
+            ]
         )
         if has_filters and not self._any_filter_match(options):
             return NoMatchingProxy("No proxy matches the requested filters")

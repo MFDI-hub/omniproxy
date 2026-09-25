@@ -29,6 +29,7 @@ from .backends.factory import get_backend
 from .config import settings
 from .constants import (
     DEFAULT_CHECK_FIELDS,
+    DEFAULT_CHECK_MAX_CONCURRENT,
     DEFAULT_CHECK_MAX_RETRIES,
     DEFAULT_CHECK_RETRY_BACKOFF,
     DEFAULT_RETRYABLE_HTTP_STATUSES,
@@ -565,9 +566,15 @@ async def acheck_proxies(
     backend: str | None = None,
     timeout: float | None = None,
     detect_anonymity: bool = False,
+    *,
+    max_concurrent: int | None = None,
     **kwargs: Any,
 ) -> tuple[list[Proxy], list[Proxy]] | tuple[list[tuple[Proxy, dict]], list[tuple[Proxy, bool]]]:
     """Check many proxies concurrently via :func:`acheck_proxy`.
+
+    Concurrency is capped so wall-clock latency is not inflated by
+    launching thousands of checks at once (the sync path already
+    defaults to 32 workers).
 
     Args:
         proxy_list (Sequence[Proxy | str]): Proxies to test in parallel.
@@ -578,6 +585,8 @@ async def acheck_proxies(
         backend (str | None): Shared backend override.
         timeout (float | None): Shared timeout override.
         detect_anonymity (bool): Forwarded per-proxy.
+        max_concurrent (int | None): Peak in-flight checks. ``None`` uses
+            :data:`~omniproxy.constants.DEFAULT_CHECK_MAX_CONCURRENT`.
         **kwargs (Any): Extra args forwarded to each check.
 
     Returns:
@@ -588,21 +597,26 @@ async def acheck_proxies(
         >>> acheck_proxies.__name__
         'acheck_proxies'
     """
-    tasks = [
-        acheck_proxy(
-            p,
-            url,
-            with_info,
-            fields,
-            raise_on_error,
-            backend=backend,
-            timeout=timeout,
-            detect_anonymity=detect_anonymity,
-            **kwargs,
-        )
-        for p in proxy_list
-    ]
-    results = await asyncio.gather(*tasks)
+    limit = max_concurrent if max_concurrent is not None else DEFAULT_CHECK_MAX_CONCURRENT
+    if limit < 1:
+        raise ValueError("max_concurrent must be >= 1")
+    sem = asyncio.Semaphore(limit)
+
+    async def _one(p: Proxy | str) -> tuple[Proxy, CheckResult | dict | bool]:
+        async with sem:
+            return await acheck_proxy(
+                p,
+                url,
+                with_info,
+                fields,
+                raise_on_error,
+                backend=backend,
+                timeout=timeout,
+                detect_anonymity=detect_anonymity,
+                **kwargs,
+            )
+
+    results = await asyncio.gather(*[_one(p) for p in proxy_list])
 
     if with_info:
         success_info = [(px, info) for px, info in results if info is not False]
@@ -799,7 +813,8 @@ def check_proxies(
         backend (str | None): Backend override.
         timeout (float | None): Timeout override.
         detect_anonymity (bool): Forwarded per check.
-        max_workers (int | None): Thread pool size when ``use_async`` is ``False``.
+        max_workers (int | None): Thread pool size when ``use_async`` is
+            ``False``; also forwarded as ``max_concurrent`` on the async path.
         **kwargs (Any): Forwarded to underlying check functions.
 
     Returns:
@@ -821,11 +836,14 @@ def check_proxies(
                 backend=backend,
                 timeout=timeout,
                 detect_anonymity=detect_anonymity,
+                max_concurrent=max_workers,
                 **kwargs,
             )
         )
 
-    workers = max_workers if max_workers is not None else min(32, max(1, len(proxy_list)))
+    workers = max_workers if max_workers is not None else min(
+        DEFAULT_CHECK_MAX_CONCURRENT, max(1, len(proxy_list))
+    )
     success: list[Any] = []
     failed: list[Any] = []
 
@@ -870,6 +888,32 @@ def check_proxies(
     return success, failed
 
 
+def _apply_health_max_latency(
+    proxy: Proxy, result: CheckResult, hc: HealthCheckConfig
+) -> CheckResult:
+    """Fail a successful probe whose latency exceeds ``hc.max_latency``.
+
+    Args:
+        proxy (Proxy): Proxy that was just checked.
+        result (CheckResult): Outcome of the HTTP (or custom) probe.
+        hc (HealthCheckConfig): Health-check spec with optional latency cap.
+
+    Returns:
+        CheckResult: Original result, or a failed copy when too slow.
+
+    Version:
+        Added in 4.0.1.
+    """
+    cap = hc.max_latency
+    if cap is None or not result.success:
+        return result
+    latency = result.latency
+    if latency is None or latency <= cap:
+        return result
+    apply_check_result_metadata(proxy, latency=latency, anonymity=None, status=False)
+    return CheckResult(False, latency, None, result.status_code)
+
+
 def run_health_check(
     proxy: Proxy | str,
     hc: HealthCheckConfig,
@@ -902,7 +946,7 @@ def run_health_check(
             proxy = Proxy(proxy)
         ok = hc.custom_check(proxy)
         res = CheckResult(success=ok, latency=None, exc_type=None, status_code=None)
-        return proxy, res
+        return proxy, _apply_health_max_latency(proxy, res, hc)
 
     url = _resolve_health_check_url(hc.url)
 
@@ -918,7 +962,7 @@ def run_health_check(
         headers=hc.headers or None,
     )
 
-    return cast(tuple[Proxy, CheckResult], (p, result))
+    return cast(tuple[Proxy, CheckResult], (p, _apply_health_max_latency(p, result, hc)))
 
 
 async def arun_health_check(
@@ -946,7 +990,7 @@ async def arun_health_check(
             proxy = Proxy(proxy)
         ok = hc.custom_check(proxy)
         res = CheckResult(success=ok, latency=None, exc_type=None, status_code=None)
-        return proxy, res
+        return proxy, _apply_health_max_latency(proxy, res, hc)
 
     url = _resolve_health_check_url(hc.url)
 
@@ -962,7 +1006,7 @@ async def arun_health_check(
         headers=hc.headers or None,
     )
 
-    return cast(tuple[Proxy, CheckResult], (p, result))
+    return cast(tuple[Proxy, CheckResult], (p, _apply_health_max_latency(p, result, hc)))
 
 
 def _rebuild_models_with_forward_proxy_refs() -> None:

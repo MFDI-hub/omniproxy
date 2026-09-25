@@ -53,7 +53,9 @@ async def run_warmup(
 
     Repeatedly takes unchecked candidates from the pool, runs the supplied
     ``health_check_fn`` against each (bounded by the pool's health semaphore),
-    and records successes. Each probe batch is bounded by the remaining
+    and records successes. ``min_ready`` ends warmup after the batch that
+    reaches it; every probe that already finished in that batch is recorded.
+    Each probe batch is bounded by the remaining
     warmup deadline; unfinished checks are cancelled so they cannot mutate
     pool state after the deadline.
 
@@ -116,8 +118,11 @@ async def run_warmup(
                 applied = await pool._record_health_check_result(proxy, result)
             if applied and _proxy_counts_as_ready(config, proxy, result):
                 ready_urls.add(proxy.url)
-                if len(ready_urls) >= config.min_ready:
-                    return True, len(ready_urls)
+
+        # min_ready stops the next wave. Every probe that already finished in
+        # this batch is recorded first, so acquire can rank all of them.
+        if len(ready_urls) >= config.min_ready:
+            return True, len(ready_urls)
 
         if timed_out or loop.time() >= deadline:
             return False, len(ready_urls)

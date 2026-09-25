@@ -5,9 +5,15 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from omniproxy.fetchers import default_fetchers
 from omniproxy.fetchers.file_fetcher import FileFetcher
 from omniproxy.fetchers.scrape_fetcher import ScrapeFetcher
-from omniproxy.fetchers.url_fetcher import URLFetcher, UrlListFormat, parse_proxy_urls_from_payload
+from omniproxy.fetchers.url_fetcher import (
+    URLFetcher,
+    UrlListFormat,
+    _apply_protocol_prefix,
+    parse_proxy_urls_from_payload,
+)
 from omniproxy.refresh import fetch_from_fetchers
 
 
@@ -110,6 +116,56 @@ async def test_fetch_from_fetchers_times_out_hung_fetcher() -> None:
     proxies = await fetch_from_fetchers(
         [_HangingFetcher(), _StaticFetcher(["127.0.0.5:9050"])],
         timeout=0.05,
+    )
+    assert len(proxies) == 1
+    assert "127.0.0.5" in proxies[0].url
+
+
+def test_apply_protocol_prefix_bare_and_prefixed() -> None:
+    lines = ["1.2.3.4:8080", "socks5://5.6.7.8:1080"]
+    assert _apply_protocol_prefix(lines, "socks5") == [
+        "socks5://1.2.3.4:8080",
+        "socks5://5.6.7.8:1080",
+    ]
+    assert _apply_protocol_prefix(lines, None) == lines
+
+
+@pytest.mark.asyncio
+async def test_url_fetcher_protocol_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    body = b"1.2.3.4:8080\nsocks5://5.6.7.8:1080\n"
+    monkeypatch.setattr(
+        "omniproxy.fetchers.url_fetcher._sync_download",
+        lambda _u, _h, _t: body,
+    )
+    f = URLFetcher(
+        "https://example.invalid/socks5.txt",
+        body_format=UrlListFormat.PLAIN,
+        protocol="socks5",
+    )
+    out = await f.fetch()
+    assert out == ["socks5://1.2.3.4:8080", "socks5://5.6.7.8:1080"]
+
+
+def test_default_fetchers_all_protocols() -> None:
+    fetchers = default_fetchers()
+    assert len(fetchers) == 3
+    urls = {f._url for f in fetchers}
+    assert any("proxyscrape.com" in u for u in urls)
+    assert any("monosans" in u for u in urls)
+    assert any("proxifly" in u for u in urls)
+
+
+def test_default_fetchers_socks5_only() -> None:
+    fetchers = default_fetchers(protocols=["socks5"])
+    assert len(fetchers) == 3
+    for f in fetchers:
+        assert "socks5" in f._url or f._protocol == "socks5"
+
+
+@pytest.mark.asyncio
+async def test_fetch_from_fetchers_drops_invalid_lines() -> None:
+    proxies = await fetch_from_fetchers(
+        [_StaticFetcher(["not-a-proxy", "127.0.0.5:9050", "also bad!!!"])]
     )
     assert len(proxies) == 1
     assert "127.0.0.5" in proxies[0].url
